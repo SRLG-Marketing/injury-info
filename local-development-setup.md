@@ -1,3 +1,124 @@
+# Local Development Setup
+
+## Quick Start
+
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **Set up environment variables:**
+   ```bash
+   cp .env.example .env.local
+   ```
+   Then edit `.env.local` with your API keys and configuration.
+
+3. **Start development server:**
+   ```bash
+   npm run dev
+   ```
+   
+   This will start the server in development mode, serving static files from the `public` directory.
+
+4. **Access the application:**
+   - Main application: http://localhost:3000
+   - API endpoints: http://localhost:3000/api/*
+
+## File Structure
+
+```
+src/
+├── public/                 # Static files (HTML, CSS, JS, images)
+│   ├── index.html         # Main application page
+│   ├── article.html       # Article template
+│   ├── ai-config.js       # Client-side AI configuration
+│   └── *.webp, *.svg      # Images and assets
+├── server.js              # Main server file
+├── server-ai-config.js    # Server-side AI configuration
+├── data-integration-service.js  # Data integration logic
+└── package.json           # Dependencies and scripts
+```
+
+## Environment Configuration
+
+### Development Mode
+- Static files are served from the `public` directory
+- Full server functionality with API endpoints
+- File watching and hot reloading (if using nodemon)
+
+### Production Mode
+- Only API endpoints are available
+- Static files should be served by a web server (nginx, Apache, etc.)
+- Set `NODE_ENV=production` to enable production mode
+
+## Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run prod` - Start production server
+- `npm start` - Start server (defaults to development)
+- `npm test` - Run API tests
+
+## API Endpoints
+
+- `POST /api/chat` - OpenAI chat completion
+- `GET /api/articles` - Get all articles
+- `GET /api/articles/:slug` - Get specific article
+- `GET /api/law-firms` - Search law firms
+- `GET /api/settlements` - Get settlement data
+- `GET /api/search/:condition` - Search condition info
+- `GET /api/test` - Test OpenAI connection
+- `GET /api/config/status` - Configuration status
+
+## Troubleshooting
+
+### "ENOENT: no such file or directory" Error
+- Make sure you're running in development mode: `npm run dev`
+- Verify that `index.html` exists in the `public` directory
+- Check that all referenced assets are in the `public` directory
+
+### API Connection Issues
+- Verify your `.env.local` file has the correct API keys
+- Test the connection: `npm test`
+- Check the server logs for detailed error messages
+
+### Static Files Not Loading
+- Ensure you're in development mode
+- Check that files exist in the `public` directory
+- Verify file permissions
+
+## Production Deployment
+
+For production deployment:
+
+1. Set `NODE_ENV=production`
+2. Configure a web server (nginx, Apache) to serve static files from `public/`
+3. Use the Express server only for API endpoints
+4. Set up proper environment variables for production
+
+Example nginx configuration:
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com;
+    
+    # Serve static files
+    location / {
+        root /path/to/your/app/public;
+        try_files $uri $uri/ /index.html;
+    }
+    
+    # Proxy API requests to Node.js
+    location /api/ {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
 # Local MCP Server → HubSpot Integration
 
 ## Overview

@@ -27,7 +27,12 @@ const dataService = new DataIntegrationService();
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('.'));
+
+// Serve static files from public directory (development only)
+if (process.env.NODE_ENV !== 'production') {
+  app.use(express.static(path.join(__dirname, 'public')));
+  console.log('🔧 Development mode: Serving static files from public directory');
+}
 
 // API endpoint for OpenAI chat
 app.post('/api/chat', async (req, res) => {
@@ -272,15 +277,17 @@ app.post('/api/lia/check-case', async (req, res) => {
   }
 });
 
-// Serve the main HTML file
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
+// Serve the main HTML file (development only)
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  });
 
-// Serve individual article pages
-app.get('/article/:slug', (req, res) => {
-  res.sendFile(path.join(__dirname, 'article.html'));
-});
+  // Serve individual article pages (development only)
+  app.get('/article/:slug', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'article.html'));
+  });
+}
 
 // Health check
 app.get('/health', (req, res) => {
@@ -290,6 +297,7 @@ app.get('/health', (req, res) => {
 // Start server
 app.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📁 Serving files from: ${__dirname}`);
   
   // Configuration status check
