@@ -299,7 +299,112 @@ export class GoogleSheetsConnector {
     return {
       isValid: missingColumns.length === 0,
       missingColumns,
-      foundColumns: headers
+      foundColumns: headers,
+      expectedColumns
     };
+  }
+
+  async createSheet(sheetName, headers = []) {
+    console.log(`📝 Creating new sheet: ${sheetName}...`);
+    
+    try {
+      // First, check if sheet already exists
+      const sheets = await this.listSheets();
+      if (sheets.includes(sheetName)) {
+        console.log(`⚠️ Sheet '${sheetName}' already exists`);
+        return { success: true, message: 'Sheet already exists' };
+      }
+
+      // Create the sheet by adding a new sheet to the spreadsheet
+      const endpoint = `/${this.spreadsheetId}:batchUpdate`;
+      const url = `${this.baseUrl}${endpoint}?key=${this.apiKey}`;
+      
+      const requestBody = {
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title: sheetName
+              }
+            }
+          }
+        ]
+      };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`Failed to create sheet: ${error.error?.message || 'Unknown error'}`);
+      }
+
+      // If headers are provided, add them as the first row
+      if (headers.length > 0) {
+        await this.appendRow(sheetName, headers);
+      }
+
+      console.log(`✅ Created sheet '${sheetName}' successfully`);
+      return { success: true, message: 'Sheet created successfully' };
+      
+    } catch (error) {
+      console.error(`❌ Error creating sheet '${sheetName}':`, error);
+      throw error;
+    }
+  }
+
+  async appendRow(sheetName, rowData) {
+    console.log(`📝 Appending row to sheet: ${sheetName}...`);
+    
+    try {
+      const endpoint = `/${this.spreadsheetId}/values/${sheetName}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
+      const url = `${this.baseUrl}${endpoint}?key=${this.apiKey}`;
+      
+      const requestBody = {
+        values: [rowData]
+      };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`Failed to append row: ${error.error?.message || 'Unknown error'}`);
+      }
+
+      console.log(`✅ Appended row to '${sheetName}' successfully`);
+      return { success: true };
+      
+    } catch (error) {
+      console.error(`❌ Error appending row to '${sheetName}':`, error);
+      throw error;
+    }
+  }
+
+  async listSheets() {
+    console.log('📋 Listing available sheets...');
+    
+    try {
+      const endpoint = `/${this.spreadsheetId}?fields=sheets.properties.title`;
+      const result = await this.makeRequest(endpoint);
+      
+      const sheetNames = result.sheets.map(sheet => sheet.properties.title);
+      console.log(`✅ Found ${sheetNames.length} sheets: ${sheetNames.join(', ')}`);
+      
+      return sheetNames;
+    } catch (error) {
+      console.error('❌ Error listing sheets:', error);
+      throw error;
+    }
   }
 } 

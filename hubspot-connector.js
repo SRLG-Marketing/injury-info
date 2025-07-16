@@ -7,7 +7,7 @@ import fetch from 'node-fetch';
 
 export class HubSpotInjuryInfoConnector {
   constructor(config = {}) {
-    this.hubspotApiKey = config.hubspotApiKey || process.env.HUBSPOT_API_KEY;
+    this.hubspotApiKey = config.hubspotApiKey || process.env.HUBSPOT_ACCESS_TOKEN;
     this.hubspotPortalId = config.hubspotPortalId || process.env.HUBSPOT_PORTAL_ID;
     this.baseUrl = 'https://api.hubapi.com';
     this.headers = {
@@ -248,4 +248,221 @@ export class HubSpotInjuryInfoConnector {
       }
     };
   }
-} 
+
+  /**
+   * Log keyword queries as contact notes for analytics
+   * This approach is lightweight and doesn't clutter the main contact record
+   */
+  async logKeywordQuery(query, source = 'chatbot') {
+    try {
+      if (!this.hubspotApiKey) {
+        console.log('⚠️ HubSpot API key not available for query logging');
+        return;
+      }
+
+      console.log(`🔍 Attempting to log query: "${query}" to HubSpot...`);
+
+      // Determine analytics email based on environment variable or fallback
+      const domain = process.env.ANALYTICS_EMAIL_DOMAIN || 'yourdomain.com';
+      const analyticsEmail = `analytics@${domain}`;
+
+      // Create a simple note with timestamp and query
+      const noteContent = `Keyword Query: "${query}"\nSource: ${source}\nTimestamp: ${new Date().toISOString()}`;
+      
+      // For now, we'll create a generic contact or use a specific one
+      // You can update this later to use actual user contact info
+      const contactData = {
+        properties: {
+          email: analyticsEmail, // Dynamic email for analytics
+          firstname: 'Analytics',
+          lastname: 'User'
+        }
+      };
+
+      console.log('📝 Creating/updating HubSpot contact...');
+      
+      // Create or update contact
+      const contactResponse = await fetch(`${this.baseUrl}/crm/v3/objects/contacts`, {
+        method: 'POST',
+        headers: this.headers,
+        body: JSON.stringify(contactData)
+      });
+
+      let contactId;
+
+      if (contactResponse.status === 409) {
+        // Contact already exists - extract the ID from the error message
+        const errorData = await contactResponse.json();
+        const match = errorData.message.match(/Existing ID: (\d+)/);
+        if (match) {
+          contactId = match[1];
+          console.log(`✅ Using existing contact: ${contactId}`);
+        } else {
+          console.error('❌ Could not extract contact ID from 409 error');
+          return null;
+        }
+      } else if (!contactResponse.ok) {
+        const errorText = await contactResponse.text();
+        console.error(`❌ HubSpot contact creation failed: ${contactResponse.status} - ${errorText}`);
+        return null;
+      } else {
+        const contactResult = await contactResponse.json();
+        contactId = contactResult.id;
+        console.log(`✅ Contact created: ${contactId}`);
+      }
+
+      // Add the note
+      const noteData = {
+        properties: {
+          hs_note_body: noteContent,
+          hs_timestamp: new Date().toISOString()
+        },
+        associations: [
+          {
+            to: {
+              id: contactId
+            },
+            types: [
+              {
+                associationCategory: "HUBSPOT_DEFINED",
+                associationTypeId: 202
+              }
+            ]
+          }
+        ]
+      };
+
+      console.log('📝 Creating HubSpot note...');
+      
+      const noteResponse = await fetch(`${this.baseUrl}/crm/v3/objects/notes`, {
+        method: 'POST',
+        headers: this.headers,
+        body: JSON.stringify(noteData)
+      });
+
+      if (!noteResponse.ok) {
+        const errorText = await noteResponse.text();
+        console.error(`❌ HubSpot note creation failed: ${noteResponse.status} - ${errorText}`);
+        return null;
+      }
+
+      const noteResult = await noteResponse.json();
+      
+      console.log(`✅ Logged keyword query: "${query}" to HubSpot contact ${contactId}, note ${noteResult.id}`);
+      return contactId;
+
+    } catch (error) {
+      console.error('❌ Error logging keyword query to HubSpot:', error.message);
+      console.error('Full error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Batch log multiple keyword queries (for hourly batches)
+   */
+  async batchLogKeywordQueries(queries, source = 'chatbot') {
+    try {
+      if (!this.hubspot) {
+        console.log('⚠️ HubSpot connector not available for batch logging');
+        return;
+      }
+
+      // Create a summary note with all queries
+      const timestamp = new Date().toISOString();
+      const queryList = queries.map(q => `- "${q}"`).join('\n');
+      
+      const noteContent = `Keyword Query Batch (${queries.length} queries)\nSource: ${source}\nTimestamp: ${timestamp}\n\nQueries:\n${queryList}`;
+      
+      // Determine analytics email based on environment variable or fallback
+      const domain = process.env.ANALYTICS_EMAIL_DOMAIN || 'yourdomain.com';
+      const analyticsEmail = `analytics@${domain}`;
+
+      // For now, we'll create a generic contact or use a specific one
+      // You can update this later to use actual user contact info
+      const contactData = {
+        properties: {
+          email: analyticsEmail, // Dynamic email for analytics
+          firstname: 'Analytics',
+          lastname: 'User'
+        }
+      };
+
+      console.log('📝 Creating/updating HubSpot contact for batch...');
+      
+      // Create or update contact
+      const contactResponse = await fetch(`${this.baseUrl}/crm/v3/objects/contacts`, {
+        method: 'POST',
+        headers: this.headers,
+        body: JSON.stringify(contactData)
+      });
+
+      let contactId;
+
+      if (contactResponse.status === 409) {
+        // Contact already exists - extract the ID from the error message
+        const errorData = await contactResponse.json();
+        const match = errorData.message.match(/Existing ID: (\d+)/);
+        if (match) {
+          contactId = match[1];
+          console.log(`✅ Using existing contact for batch: ${contactId}`);
+        } else {
+          console.error('❌ Could not extract contact ID from 409 error');
+          return null;
+        }
+      } else if (!contactResponse.ok) {
+        const errorText = await contactResponse.text();
+        console.error(`❌ HubSpot contact creation failed: ${contactResponse.status} - ${errorText}`);
+        return null;
+      } else {
+        const contactResult = await contactResponse.json();
+        contactId = contactResult.id;
+        console.log(`✅ Contact created for batch: ${contactId}`);
+      }
+
+      // Add the batch note
+      const noteData = {
+        properties: {
+          hs_note_body: noteContent,
+          hs_timestamp: timestamp
+        },
+        associations: [
+          {
+            to: {
+              id: contactId
+            },
+            types: [
+              {
+                associationCategory: "HUBSPOT_DEFINED",
+                associationTypeId: 202
+              }
+            ]
+          }
+        ]
+      };
+
+      console.log('📝 Creating HubSpot batch note...');
+      
+      const noteResponse = await fetch(`${this.baseUrl}/crm/v3/objects/notes`, {
+        method: 'POST',
+        headers: this.headers,
+        body: JSON.stringify(noteData)
+      });
+
+      if (!noteResponse.ok) {
+        const errorText = await noteResponse.text();
+        console.error(`❌ HubSpot batch note creation failed: ${noteResponse.status} - ${errorText}`);
+        return null;
+      }
+
+      const noteResult = await noteResponse.json();
+      
+      console.log(`✅ Batch logged ${queries.length} keyword queries to HubSpot contact ${contactId}, note ${noteResult.id}`);
+      return contactId;
+
+    } catch (error) {
+      console.error('❌ Error batch logging keyword queries to HubSpot:', error.message);
+      return null;
+    }
+  }
+}

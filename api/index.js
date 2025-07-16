@@ -39,6 +39,9 @@ app.post('/api/chat', async (req, res) => {
 
     console.log('Received chat request:', { message, systemMessage: systemMessage?.substring(0, 100) + '...' });
 
+    // Log the query for analytics (lightweight HubSpot contact notes)
+    await dataService.logQuery(message, 'chatbot');
+
     // Prepare messages for OpenAI
     const messages = [];
     

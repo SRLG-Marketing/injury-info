@@ -1202,4 +1202,156 @@ export class DataIntegrationService {
             source: 'fallback'
         };
     }
+
+    /**
+     * Track user queries and keywords for analytics
+     */
+    async trackUserQuery(query, context = {}) {
+        try {
+            // Import the QueryLogger dynamically to avoid circular dependencies
+            const { QueryLogger } = await import('./utils/query-logger.js');
+            
+            if (!this.queryLogger) {
+                this.queryLogger = new QueryLogger();
+            }
+
+            // Extract keywords from the query
+            const keywords = this.extractKeywords(query);
+            
+            // Check if this relates to any LIA active case
+            const liaCaseInfo = await this.checkLIAActiveCase(query);
+            
+            // Prepare tracking data
+            const trackingData = {
+                query: query,
+                keywords: keywords,
+                liaCaseDetected: liaCaseInfo && liaCaseInfo.isActive,
+                liaCaseType: liaCaseInfo && liaCaseInfo.isActive ? liaCaseInfo.caseType : '',
+                liaCaseName: liaCaseInfo && liaCaseInfo.isActive ? liaCaseInfo.name : '',
+                userAgent: context.userAgent || '',
+                ipAddress: context.ipAddress || '',
+                sessionId: context.sessionId || '',
+                pageUrl: context.pageUrl || '',
+                referrer: context.referrer || ''
+            };
+
+            // Log the query
+            const result = await this.queryLogger.logQuery(trackingData);
+            
+            if (result.success) {
+                console.log(`📊 Tracked query: "${query}" with ${keywords.length} keywords`);
+            }
+            
+            return {
+                tracked: result.success,
+                keywords: keywords,
+                liaCaseDetected: liaCaseInfo && liaCaseInfo.isActive,
+                error: result.error
+            };
+            
+        } catch (error) {
+            console.error('❌ Error tracking user query:', error);
+            return { tracked: false, error: error.message };
+        }
+    }
+
+    /**
+     * Extract meaningful keywords from a query
+     */
+    extractKeywords(query) {
+        if (!query || typeof query !== 'string') {
+            return [];
+        }
+
+        // Normalize the query
+        const normalized = query.toLowerCase()
+            .replace(/[^\w\s]/g, ' ') // Remove punctuation
+            .replace(/\s+/g, ' ') // Normalize whitespace
+            .trim();
+
+        // Split into words
+        const words = normalized.split(' ');
+
+        // Filter out common stop words and short words
+        const stopWords = new Set([
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
+            'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
+            'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these', 'those',
+            'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them',
+            'my', 'your', 'his', 'her', 'its', 'our', 'their', 'mine', 'yours', 'his', 'hers', 'ours', 'theirs',
+            'what', 'when', 'where', 'why', 'how', 'who', 'which', 'whom', 'whose',
+            'if', 'then', 'else', 'than', 'as', 'so', 'because', 'since', 'while', 'until',
+            'about', 'against', 'between', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
+            'from', 'up', 'down', 'out', 'off', 'over', 'under', 'again', 'further', 'then', 'once',
+            'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more',
+            'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'too', 'very'
+        ]);
+
+        // Extract meaningful keywords
+        const keywords = words
+            .filter(word => word.length > 2) // Remove very short words
+            .filter(word => !stopWords.has(word)) // Remove stop words
+            .filter(word => !/^\d+$/.test(word)) // Remove pure numbers
+            .slice(0, 10); // Limit to top 10 keywords
+
+        return keywords;
+    }
+
+    /**
+     * Get query analytics from file logs
+     */
+    async getQueryAnalytics(days = 30) {
+        try {
+            // Import the QueryLogger dynamically to avoid circular dependencies
+            const { QueryLogger } = await import('./utils/query-logger.js');
+            
+            if (!this.queryLogger) {
+                this.queryLogger = new QueryLogger();
+            }
+
+            const analytics = await this.queryLogger.getAnalytics(days);
+            return analytics;
+
+        } catch (error) {
+            console.error('❌ Error getting query analytics:', error);
+            return {
+                totalQueries: 0,
+                topKeywords: [],
+                liaCaseStats: {},
+                recentQueries: [],
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * Log a user query for analytics
+     */
+    async logQuery(query, source = 'chatbot') {
+        try {
+            // Use HubSpot contact notes for lightweight logging
+            if (this.hubspot) {
+                await this.hubspot.logKeywordQuery(query, source);
+            } else {
+                console.log('⚠️ HubSpot connector not available, skipping query log');
+            }
+        } catch (error) {
+            console.error('❌ Error logging query:', error.message);
+        }
+    }
+
+    /**
+     * Batch log multiple queries (for scheduled sending)
+     */
+    async batchLogQueries(queries, source = 'chatbot') {
+        try {
+            if (this.hubspot) {
+                await this.hubspot.batchLogKeywordQueries(queries, source);
+            } else {
+                console.log('⚠️ HubSpot connector not available, skipping batch log');
+            }
+        } catch (error) {
+            console.error('❌ Error batch logging queries:', error.message);
+        }
+    }
 } 

@@ -59,6 +59,20 @@ app.post('/api/chat', async (req, res) => {
       apiBaseUrl
     });
 
+    // Track user query for analytics (non-blocking)
+    const trackingContext = {
+      userAgent: req.get('User-Agent'),
+      ipAddress: req.ip || req.connection.remoteAddress,
+      sessionId: req.session?.id || 'unknown',
+      pageUrl: req.get('Referer') || '',
+      referrer: req.get('Referer') || ''
+    };
+    
+    // Track query asynchronously (don't wait for it)
+    dataService.trackUserQuery(message, trackingContext).catch(error => {
+      console.warn('Could not track user query:', error.message);
+    });
+
     // Get relevant data for context
     let contextData = [];
     let liaCaseInfo = null;
@@ -377,6 +391,48 @@ app.post('/api/lia/check-case', async (req, res) => {
   } catch (error) {
     console.error('❌ Error in LIA case check:', error);
     res.status(500).json({ error: 'Failed to check LIA case' });
+  }
+});
+
+// API endpoint to get query analytics
+app.get('/api/analytics/queries', async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    console.log(`📊 Fetching query analytics for last ${days} days`);
+    
+    const analytics = await dataService.getQueryAnalytics(parseInt(days));
+    
+    console.log(`✅ Returning analytics: ${analytics.totalQueries} queries, ${analytics.topKeywords.length} top keywords`);
+    res.json(analytics);
+  } catch (error) {
+    console.error('❌ Error fetching query analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
+// API endpoint to export query analytics as CSV
+app.get('/api/analytics/export', async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    console.log(`📥 Exporting query analytics for last ${days} days`);
+    
+    // Import the QueryLogger dynamically
+    const { QueryLogger } = await import('./utils/query-logger.js');
+    const queryLogger = new QueryLogger();
+    
+    const result = await queryLogger.exportToCSV(parseInt(days));
+    
+    if (!result.success) {
+      return res.status(500).json({ error: 'Failed to export analytics' });
+    }
+    
+    // Send the CSV file
+    res.download(result.file, `query-analytics-${new Date().toISOString().split('T')[0]}.csv`);
+    console.log(`✅ Exported CSV: ${result.file}`);
+    
+  } catch (error) {
+    console.error('❌ Error exporting analytics:', error);
+    res.status(500).json({ error: 'Failed to export analytics' });
   }
 });
 
