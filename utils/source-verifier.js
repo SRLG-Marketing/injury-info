@@ -499,9 +499,9 @@ export async function findRelevantSources(query, aiResponse) {
       sources.push(...topicSources);
     }
     
-    // Remove duplicates and limit to top 10 sources
+    // Remove duplicates and limit to top 3 sources
     const uniqueSources = removeDuplicateSources(sources);
-    return uniqueSources.slice(0, 10);
+    return uniqueSources.slice(0, 3);
     
   } catch (error) {
     console.error('Error finding sources:', error);
@@ -561,42 +561,54 @@ async function findSourcesForTopic(topic, needsMedical, needsLegal) {
     const specificMappings = TOPIC_URL_MAPPINGS[topicLower];
     
     if (specificMappings) {
-      // Use specific, targeted URLs
-      if (needsMedical && specificMappings.medical) {
-        sources.push(...specificMappings.medical);
-      }
+      // Use specific, targeted URLs with priority order
+      const prioritySources = [];
       
-      if (needsLegal && specificMappings.legal) {
-        sources.push(...specificMappings.legal);
-      }
-      
-      // Always include government sources if available
+      // Priority 1: Government sources (highest reliability)
       if (specificMappings.government) {
-        sources.push(...specificMappings.government);
+        prioritySources.push(...specificMappings.government);
       }
       
-      // Always include news sources if available
-      if (specificMappings.news) {
-        sources.push(...specificMappings.news);
+      // Priority 2: Medical sources
+      if (needsMedical && specificMappings.medical) {
+        prioritySources.push(...specificMappings.medical);
       }
+      
+      // Priority 3: Legal sources
+      if (needsLegal && specificMappings.legal) {
+        prioritySources.push(...specificMappings.legal);
+      }
+      
+      // Priority 4: News sources (lowest priority)
+      if (specificMappings.news) {
+        prioritySources.push(...specificMappings.news);
+      }
+      
+      // Take the top 3 sources based on priority
+      sources.push(...prioritySources.slice(0, 3));
     } else {
       // Fallback to search URLs for topics not in our specific mappings
+      const fallbackSources = [];
+      
       if (needsMedical) {
         const medicalSources = await searchMedicalSources(topic);
-        sources.push(...medicalSources);
+        fallbackSources.push(...medicalSources);
       }
       
       if (needsLegal) {
         const legalSources = await searchLegalSources(topic);
-        sources.push(...legalSources);
+        fallbackSources.push(...legalSources);
       }
       
       const governmentSources = await searchGovernmentSources(topic);
-      sources.push(...governmentSources);
+      fallbackSources.push(...governmentSources);
       
       // Add news sources for all topics
       const newsSources = await searchNewsSources(topic);
-      sources.push(...newsSources);
+      fallbackSources.push(...newsSources);
+      
+      // Take the top 3 sources
+      sources.push(...fallbackSources.slice(0, 3));
     }
     
   } catch (error) {
