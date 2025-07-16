@@ -54,6 +54,8 @@ export function getCorsOrigins() {
   return [
     'https://injury-info.vercel.app',
     'https://your-app.vercel.app',
-    'https://*.vercel.app'
+    'https://*.vercel.app',
+    'https://srlg-marketing.github.io',
+    'https://*.github.io'
   ];
 } 

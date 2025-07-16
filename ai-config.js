@@ -381,6 +381,9 @@ export function markdownToHtml(md) {
     if (!md) return '';
     let html = md;
     
+    // Links [text](url) - must be processed before other formatting
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    
     // Bold **text** or __text__
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
@@ -389,21 +392,35 @@ export function markdownToHtml(md) {
     html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
     html = html.replace(/_(.*?)_/g, '<em>$1</em>');
     
+    // Handle bullet lists (- item, * item, • item) - process before line breaks
+    html = html.replace(/^[-*•]\s+(.*?)$/gm, '<li>$1</li>');
+    
     // Handle numbered lists (1. item)
     html = html.replace(/^\d+\.\s+(.*?)$/gm, '<li>$1</li>');
     
-    // Handle bullet lists (- item, * item, • item)
-    html = html.replace(/^[-*•]\s+(.*?)$/gm, '<li>$1</li>');
-    
-    // Wrap consecutive <li> elements in <ul>
+    // Wrap consecutive <li> elements in <ul> with compact styling
     html = html.replace(/(<li>.*?<\/li>)+/gs, function(match) {
-        return '<ul>' + match + '</ul>';
+        return '<ul style="margin: 0; padding-left: 20px; line-height: 1.4;">' + match + '</ul>';
     });
     
-    // Handle line breaks and paragraphs
+    // Handle line breaks and paragraphs - but preserve list formatting
+    // Don't convert line breaks within lists to <br> tags
     html = html.replace(/\n{3,}/g, '</p><p>');
     html = html.replace(/\n{2}/g, '<br><br>');
-    html = html.replace(/\n/g, '<br>');
+    
+    // Only convert single line breaks to <br> if they're not part of a list
+    html = html.replace(/\n/g, function(match, offset, string) {
+        // Check if this line break is between list items
+        const before = string.substring(0, offset);
+        const after = string.substring(offset + 1);
+        
+        // If we're in a list context, don't convert to <br>
+        if (before.includes('<li>') && after.includes('</li>')) {
+            return '';
+        }
+        
+        return '<br>';
+    });
     
     // Wrap in paragraph tags if not already wrapped
     if (!html.startsWith('<')) {
