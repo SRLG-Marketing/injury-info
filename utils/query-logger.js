@@ -1,6 +1,7 @@
 /**
  * Query Logger - File-based logging for user queries and analytics
  * Stores data in JSON files for easy analysis and export
+ * Disabled in serverless environments where file system is read-only
  */
 
 import fs from 'fs/promises';
@@ -13,13 +14,44 @@ const __dirname = path.dirname(__filename);
 export class QueryLogger {
     constructor() {
         this.logsDir = path.join(__dirname, '..', 'logs');
-        this.ensureLogsDirectory();
+        this.isServerless = this.detectServerlessEnvironment();
+        
+        if (!this.isServerless) {
+            this.ensureLogsDirectory();
+        }
+    }
+
+    /**
+     * Detect if running in a serverless environment
+     */
+    detectServerlessEnvironment() {
+        // Check for Vercel environment
+        if (process.env.VERCEL || process.env.VERCEL_ENV) {
+            return true;
+        }
+        
+        // Check for AWS Lambda
+        if (process.env.AWS_LAMBDA_FUNCTION_NAME) {
+            return true;
+        }
+        
+        // Check for other serverless platforms
+        if (process.env.FUNCTIONS_WORKER_RUNTIME || process.env.K_SERVICE) {
+            return true;
+        }
+        
+        return false;
     }
 
     /**
      * Ensure the logs directory exists
      */
     async ensureLogsDirectory() {
+        if (this.isServerless) {
+            console.log('📝 File logging disabled in serverless environment');
+            return;
+        }
+        
         try {
             await fs.access(this.logsDir);
         } catch (error) {
@@ -41,6 +73,22 @@ export class QueryLogger {
      */
     async logQuery(queryData) {
         try {
+            if (this.isServerless) {
+                // In serverless environment, log to console and optionally to external service
+                console.log(`📊 Query logged (serverless): "${queryData.query}" with ${queryData.keywords?.length || 0} keywords`);
+                
+                // Optional: Send to external logging service if configured
+                if (process.env.EXTERNAL_LOGGING_URL) {
+                    try {
+                        await this.sendToExternalLogger(queryData);
+                    } catch (externalError) {
+                        console.warn('⚠️ Failed to send to external logger:', externalError.message);
+                    }
+                }
+                
+                return { success: true, serverless: true };
+            }
+            
             await this.ensureLogsDirectory();
             
             const logFile = this.getTodayLogFile();
@@ -79,10 +127,52 @@ export class QueryLogger {
     }
 
     /**
+     * Send log data to external logging service (for serverless environments)
+     */
+    async sendToExternalLogger(queryData) {
+        if (!process.env.EXTERNAL_LOGGING_URL) {
+            return;
+        }
+        
+        const logEntry = {
+            timestamp: new Date().toISOString(),
+            environment: 'serverless',
+            ...queryData
+        };
+        
+        const response = await fetch(process.env.EXTERNAL_LOGGING_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(process.env.EXTERNAL_LOGGING_API_KEY && {
+                    'Authorization': `Bearer ${process.env.EXTERNAL_LOGGING_API_KEY}`
+                })
+            },
+            body: JSON.stringify(logEntry)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`External logging failed: ${response.status} ${response.statusText}`);
+        }
+    }
+
+    /**
      * Get analytics for a date range
      */
     async getAnalytics(days = 30) {
         try {
+            if (this.isServerless) {
+                // In serverless environment, return empty analytics
+                console.log('📊 Analytics requested in serverless environment - returning empty data');
+                return {
+                    totalQueries: 0,
+                    topKeywords: [],
+                    liaCaseStats: {},
+                    recentQueries: [],
+                    serverless: true
+                };
+            }
+            
             await this.ensureLogsDirectory();
             
             const cutoffDate = new Date();
@@ -195,6 +285,11 @@ export class QueryLogger {
      */
     async exportToCSV(days = 30) {
         try {
+            if (this.isServerless) {
+                console.log('📥 CSV export requested in serverless environment - not available');
+                return { success: false, error: 'CSV export not available in serverless environment', serverless: true };
+            }
+            
             const analytics = await this.getAnalytics(days);
             
             let csv = 'Query,Keywords,LIA Case,Timestamp\n';
@@ -224,6 +319,11 @@ export class QueryLogger {
      */
     async getLogFiles() {
         try {
+            if (this.isServerless) {
+                console.log('📁 Log files requested in serverless environment - returning empty list');
+                return [];
+            }
+            
             await this.ensureLogsDirectory();
             const files = await fs.readdir(this.logsDir);
             return files
@@ -241,6 +341,11 @@ export class QueryLogger {
      */
     async cleanupOldLogs(keepDays = 90) {
         try {
+            if (this.isServerless) {
+                console.log('🧹 Log cleanup requested in serverless environment - not available');
+                return { success: false, error: 'Log cleanup not available in serverless environment', serverless: true };
+            }
+            
             const cutoffDate = new Date();
             cutoffDate.setDate(cutoffDate.getDate() - keepDays);
             
