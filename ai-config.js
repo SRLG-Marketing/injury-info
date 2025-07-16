@@ -224,7 +224,11 @@ export const AI_CONFIG = {
         model: 'gpt-4o-mini',
         temperature: 0.7,
         max_tokens: 500,
-        baseURL: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+        baseURL: typeof window !== 'undefined' ? 
+            (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                ? 'http://localhost:3000' 
+                : 'https://injury-info.vercel.app') 
+            : 'http://localhost:3000'
     },
 
     // Configuration status (will be populated from server)
@@ -346,6 +350,13 @@ export async function addLegalReferralIfNeeded(text) {
     }
     
     return text;
+}
+
+// Helper function to process sources in AI response
+export function processSourcesInResponse(response) {
+    // The sources are now added server-side, so we just need to ensure proper formatting
+    // The markdown links will be converted to HTML by the markdownToHtml function
+    return response;
 }
 
 // Helper function to get error message based on error type

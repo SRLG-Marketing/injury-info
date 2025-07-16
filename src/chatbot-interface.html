@@ -177,7 +177,7 @@
 
     <script type="module">
         import OpenAIChatbotConnector from './openai-chatbot-connector.js';
-        import { AI_CONFIG, createApiRequest, addLegalReferralIfNeeded, getErrorMessage, markdownToHtml, addArticleLinksToResponse } from '../ai-config.js';
+        import { AI_CONFIG, createApiRequest, addLegalReferralIfNeeded, getErrorMessage, markdownToHtml, addArticleLinksToResponse, processSourcesInResponse } from '../ai-config.js';
 
         class ChatbotInterface {
             constructor() {
@@ -248,7 +248,14 @@
                 try {
                     const response = await this.chatbot.sendMessage(message);
                     loadingDiv.remove();
-                    this.addMessageToChat(response, 'assistant');
+                    
+                    // Process response with sources and formatting
+                    const responseWithReferral = await addLegalReferralIfNeeded(response);
+                    const processedResponse = addArticleLinksToResponse(responseWithReferral);
+                    const processedWithSources = processSourcesInResponse(processedResponse);
+                    const htmlResponse = markdownToHtml(processedWithSources);
+                    
+                    this.addMessageToChat(htmlResponse, 'assistant');
                 } catch (error) {
                     loadingDiv.remove();
                     this.addMessageToChat(`Error: ${error.message}`, 'assistant');
@@ -262,9 +269,9 @@
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `message ${sender}-message`;
                 
-                // Apply markdown formatting for assistant messages
+                // For assistant messages, the message is already processed HTML
                 if (sender === 'assistant') {
-                    messageDiv.innerHTML = markdownToHtml(message);
+                    messageDiv.innerHTML = message;
                 } else {
                     messageDiv.textContent = message;
                 }

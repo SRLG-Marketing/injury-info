@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS Test - Injury Info API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .loading {
+            background-color: #fff3cd;
+            border-color: #ffeaa7;
+            color: #856404;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        .response {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 CORS Test - Injury Info API</h1>
+        <p>This page tests the API endpoints to ensure CORS is working correctly.</p>
+
+        <div class="test-section">
+            <h3>1. Test API Connection</h3>
+            <button onclick="testConnection()">Test Connection</button>
+            <div id="connection-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Test Chat API</h3>
+            <textarea id="test-message" placeholder="Enter your test message here...">What are the symptoms of mesothelioma?</textarea>
+            <button onclick="testChat()">Send Test Message</button>
+            <div id="chat-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Test Configuration Status</h3>
+            <button onclick="testConfig()">Get Config Status</button>
+            <div id="config-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Environment Detection</h3>
+            <div id="env-info"></div>
+        </div>
+    </div>
+
+    <script>
+        // Detect environment
+        function detectEnvironment() {
+            const envInfo = document.getElementById('env-info');
+            const hostname = window.location.hostname;
+            const protocol = window.location.protocol;
+            const port = window.location.port;
+            
+            let environment = 'Unknown';
+            let serverUrl = 'Unknown';
+            
+            if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                environment = 'Development';
+                serverUrl = 'http://localhost:3000';
+            } else {
+                environment = 'Production';
+                serverUrl = 'https://injury-info.vercel.app';
+            }
+            
+            envInfo.innerHTML = `
+                <div class="success">
+                    <strong>Environment:</strong> ${environment}<br>
+                    <strong>Hostname:</strong> ${hostname}<br>
+                    <strong>Protocol:</strong> ${protocol}<br>
+                    <strong>Port:</strong> ${port || 'default'}<br>
+                    <strong>Server URL:</strong> ${serverUrl}
+                </div>
+            `;
+        }
+
+        // Test basic API connection
+        async function testConnection() {
+            const resultDiv = document.getElementById('connection-result');
+            resultDiv.innerHTML = '<div class="loading">Testing connection...</div>';
+            
+            try {
+                const serverUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                    ? 'http://localhost:3000'
+                    : 'https://injury-info.vercel.app';
+                
+                const response = await fetch(`${serverUrl}/api/test`);
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <strong>✅ Connection Successful!</strong><br>
+                        <strong>Status:</strong> ${response.status}<br>
+                        <strong>Message:</strong> ${data.message}<br>
+                        <strong>Response:</strong> ${data.response}
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <strong>❌ Connection Failed!</strong><br>
+                        <strong>Error:</strong> ${error.message}<br>
+                        <strong>Type:</strong> ${error.name}
+                    </div>
+                `;
+            }
+        }
+
+        // Test chat API
+        async function testChat() {
+            const resultDiv = document.getElementById('chat-result');
+            const message = document.getElementById('test-message').value;
+            
+            if (!message.trim()) {
+                resultDiv.innerHTML = '<div class="error">Please enter a test message.</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div class="loading">Sending message...</div>';
+            
+            try {
+                const serverUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                    ? 'http://localhost:3000'
+                    : 'https://injury-info.vercel.app';
+                
+                const response = await fetch(`${serverUrl}/api/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message
+                    })
+                });
+                
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <strong>✅ Chat API Working!</strong><br>
+                        <strong>Status:</strong> ${response.status}<br>
+                        <strong>Verified:</strong> ${data.verified}<br>
+                        <strong>Response:</strong>
+                        <div class="response">${data.response}</div>
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <strong>❌ Chat API Failed!</strong><br>
+                        <strong>Error:</strong> ${error.message}<br>
+                        <strong>Type:</strong> ${error.name}
+                    </div>
+                `;
+            }
+        }
+
+        // Test configuration status
+        async function testConfig() {
+            const resultDiv = document.getElementById('config-result');
+            resultDiv.innerHTML = '<div class="loading">Getting configuration status...</div>';
+            
+            try {
+                const serverUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                    ? 'http://localhost:3000'
+                    : 'https://injury-info.vercel.app';
+                
+                const response = await fetch(`${serverUrl}/api/config/status`);
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <strong>✅ Configuration Retrieved!</strong><br>
+                        <strong>Status:</strong> ${response.status}<br>
+                        <strong>OpenAI:</strong> ${data.openai.configured ? '✅ Configured' : '❌ Not Configured'}<br>
+                        <strong>Google:</strong> ${data.google.configured ? '✅ Configured' : '❌ Not Configured'}<br>
+                        <strong>HubSpot:</strong> ${data.hubspot.configured ? '✅ Configured' : '❌ Not Configured'}<br>
+                        <strong>Validation:</strong> ${data.validation.isValid ? '✅ Valid' : '❌ Invalid'}
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <strong>❌ Configuration Check Failed!</strong><br>
+                        <strong>Error:</strong> ${error.message}<br>
+                        <strong>Type:</strong> ${error.name}
+                    </div>
+                `;
+            }
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            detectEnvironment();
+        });
+    </script>
+</body>
+</html> 

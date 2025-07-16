@@ -8,6 +8,8 @@ import { SERVER_AI_CONFIG, createOpenAIRequest, getServerErrorMessage, validateC
 import { DataIntegrationService } from './data-integration-service.js';
 import { DataVerificationMiddleware } from './data-verification-middleware.js';
 import { getBaseUrl, getApiBaseUrl } from './utils/url-helper.js';
+import { addSourcesToResponse } from './utils/source-verifier.js';
+import { getCorsOrigins } from './config/server-urls.js';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -30,7 +32,12 @@ const dataService = new DataIntegrationService();
 const verificationMiddleware = new DataVerificationMiddleware();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: getCorsOrigins(),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
 app.use(express.json());
 
 // Serve static files from public directory (development only)
@@ -150,8 +157,11 @@ app.post('/api/chat', async (req, res) => {
     // Verify response against data sources
     const verification = await verificationMiddleware.verifyResponse(aiResponse, message);
     
+    // Add reputable sources to the response
+    const responseWithSources = await addSourcesToResponse(message, verification.response);
+    
     res.json({ 
-      response: verification.response,
+      response: responseWithSources,
       verified: verification.verified,
       warnings: verification.warnings,
       claimsVerified: verification.claimsVerified,
