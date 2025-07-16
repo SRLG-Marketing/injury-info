@@ -42,20 +42,46 @@ export function getClientServerUrl() {
 export function getCorsOrigins() {
   const isDevelopment = process.env.NODE_ENV !== 'production';
   
-  if (isDevelopment) {
-    return [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'http://localhost:8080',
-      'http://127.0.0.1:8080'
-    ];
-  }
-  
-  return [
+  // Base origins
+  const baseOrigins = [
     'https://injury-info.vercel.app',
     'https://your-app.vercel.app',
     'https://*.vercel.app',
     'https://srlg-marketing.github.io',
     'https://*.github.io'
   ];
+  
+  // HubSpot domains
+  const hubspotOrigins = [
+    'https://*.hubspot.com',
+    'https://*.hubapi.com',
+    'https://*.hs-sites.com',
+    'https://*.hs-sitescontent.com',
+    'https://*.hsforms.com',
+    'https://*.hsforms.net',
+    'https://*.hubspotusercontent-na1.net',
+    'https://*.hubspotusercontent-eu1.net',
+    'https://*.hubspotusercontent.com'
+  ];
+  
+  if (isDevelopment) {
+    return [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:8080',
+      'http://127.0.0.1:8080',
+      ...baseOrigins,
+      ...hubspotOrigins
+    ];
+  }
+  
+  return [...baseOrigins, ...hubspotOrigins];
+}
+
+// Function to add custom HubSpot domain
+export function addHubSpotDomain(domain) {
+  // This function can be used to dynamically add specific HubSpot domains
+  // For now, we'll log it for debugging
+  console.log(`🔧 Adding HubSpot domain to CORS: ${domain}`);
+  return domain;
 } 
