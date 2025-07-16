@@ -45,9 +45,17 @@ export class DataVerificationMiddleware {
                 }
             }
 
+            // Only add a professional note if there were significant verification issues
             if (warnings.length > 0) {
                 console.log('⚠️ Verification warnings:', warnings);
-                verifiedResponse += '\n\nNote: Some information has been verified against our database. For complete accuracy, please consult with qualified professionals.';
+                
+                // Add a cleaner, more professional note
+                const note = '\n\n*This information is provided for general educational purposes. For specific medical or legal advice, please consult with qualified professionals.*';
+                
+                // Only add the note if it's not already present
+                if (!verifiedResponse.includes('consult with qualified professionals')) {
+                    verifiedResponse += note;
+                }
             }
 
             console.log('✅ Response verification complete');
@@ -60,10 +68,10 @@ export class DataVerificationMiddleware {
 
         } catch (error) {
             console.error('❌ Error during response verification:', error);
-            // Return original response with warning if verification fails
+            // Return original response with a professional note if verification fails
             return {
                 verified: false,
-                response: aiResponse + '\n\nNote: Unable to verify all information. Please consult with qualified professionals.',
+                response: aiResponse + '\n\n*This information is provided for general educational purposes. For specific advice, please consult with qualified professionals.*',
                 warnings: ['Verification system unavailable'],
                 claimsVerified: 0
             };
@@ -76,14 +84,13 @@ export class DataVerificationMiddleware {
     extractClaims(response) {
         const claims = [];
         
-        // Look for specific numbers, dates, case names, etc.
+        // Look for specific numbers, dates, case names, etc. - be more selective
         const patterns = [
-            /\$[\d,]+(?:\.\d{2})?/g, // Dollar amounts
+            /\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?/g, // Dollar amounts (more specific)
             /\d{1,2}\/\d{1,2}\/\d{4}/g, // Dates
             /case\s+(?:of\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/gi, // Case names
-            /settlement\s+(?:of\s+)?\$[\d,]+/gi, // Settlement amounts
-            /(?:average|typical)\s+(?:settlement|compensation)\s+(?:of\s+)?\$[\d,]+/gi, // Average amounts
-            /(?:diagnosed|diagnosis)\s+(?:with\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/gi, // Medical diagnoses
+            /settlement\s+(?:of\s+)?\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?/gi, // Specific settlement amounts
+            /(?:average|typical)\s+(?:settlement|compensation)\s+(?:of\s+)?\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?/gi, // Specific average amounts
         ];
 
         patterns.forEach(pattern => {
@@ -93,12 +100,11 @@ export class DataVerificationMiddleware {
             }
         });
 
-        // Extract article references
+        // Extract article references - be more specific
         const articlePatterns = [
-            /(?:read|check|see|visit|article|page|post)\s+(?:our\s+)?(?:article\s+)?(?:about\s+)?["']?([^"']+)["']?/gi,
-            /(?:article|page|post)\s+(?:titled\s+)?["']?([^"']+)["']?/gi,
-            /(?:visit|go\s+to|check\s+out)\s+(?:our\s+)?(?:article\s+)?(?:about\s+)?["']?([^"']+)["']?/gi,
-            /(?:we\s+have\s+an\s+article|there's\s+an\s+article|you\s+can\s+read)\s+(?:about\s+)?["']?([^"']+)["']?/gi
+            /(?:read|check|see|visit)\s+(?:our\s+)?(?:article\s+)?(?:about\s+)?["']([^"']+)["']/gi,
+            /(?:article|page|post)\s+(?:titled\s+)?["']([^"']+)["']/gi,
+            /(?:we\s+have\s+an\s+article|there's\s+an\s+article)\s+(?:about\s+)?["']([^"']+)["']/gi
         ];
 
         articlePatterns.forEach(pattern => {
@@ -106,7 +112,7 @@ export class DataVerificationMiddleware {
             if (matches) {
                 // Extract the article title/content from the match
                 const articleContent = matches.map(match => {
-                    const titleMatch = match.match(/["']?([^"']+)["']?/);
+                    const titleMatch = match.match(/["']([^"']+)["']/);
                     return titleMatch ? titleMatch[1] : match;
                 });
                 claims.push(...articleContent);
@@ -278,18 +284,43 @@ export class DataVerificationMiddleware {
     removeUnverifiedClaim(response, claim) {
         // Check if it's an article reference
         if (this.isArticleReference(claim)) {
-            // Replace article references with a generic statement
+            // Remove article references entirely instead of adding clunky text
             return response.replace(
                 new RegExp(claim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-                '[article not found in our database]'
+                ''
+            ).replace(/\s+/g, ' ').trim(); // Clean up extra spaces
+        }
+        
+        // For specific claims, try to replace with more general language
+        const claimLower = claim.toLowerCase();
+        
+        // Handle common patterns more elegantly
+        if (claimLower.includes('settlement') || claimLower.includes('compensation')) {
+            return response.replace(
+                new RegExp(claim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+                'settlement amounts vary by case'
             );
         }
         
-        // Replace specific claims with generic statements
+        if (claimLower.includes('symptoms') || claimLower.includes('diagnosis')) {
+            return response.replace(
+                new RegExp(claim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+                'symptoms and diagnosis vary by individual'
+            );
+        }
+        
+        if (claimLower.includes('treatment')) {
+            return response.replace(
+                new RegExp(claim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+                'treatment options should be discussed with medical professionals'
+            );
+        }
+        
+        // For other claims, remove them entirely rather than adding clunky text
         return response.replace(
             new RegExp(claim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-            '[information not verified]'
-        );
+            ''
+        ).replace(/\s+/g, ' ').trim(); // Clean up extra spaces
     }
 
     /**
