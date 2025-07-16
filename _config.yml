@@ -1,0 +1,22 @@
+# Jekyll configuration to disable processing of problematic files
+exclude:
+  - "*.md"
+  - "node_modules"
+  - ".env*"
+  - "*.log"
+  - "logs"
+  - "scripts"
+  - "src"
+  - "utils"
+  - "api"
+  - "*.js"
+  - "*.json"
+  - "*.yaml"
+  - "*.yml"
+  - "*.txt"
+  - "*.md"
+
+# Disable Jekyll processing
+markdown: kramdown
+highlighter: rouge
+safe: true 
