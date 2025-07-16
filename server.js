@@ -96,7 +96,7 @@ app.post('/api/chat', async (req, res) => {
     }
 
     // Add context data if available
-    if (contextData.length > 0 || liaCaseInfo) {
+    if (contextData.length > 0 || (liaCaseInfo && liaCaseInfo.isActive)) {
       let contextMessage = '';
       
       if (contextData.length > 0) {
