@@ -36,9 +36,53 @@ app.use(cors({
   origin: getCorsOrigins(),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Cache-Control',
+    'Pragma',
+    'Expires',
+    'Accept',
+    'Accept-Language',
+    'Accept-Encoding',
+    'DNT',
+    'Connection',
+    'Upgrade-Insecure-Requests',
+    'User-Agent',
+    'Sec-Fetch-Dest',
+    'Sec-Fetch-Mode',
+    'Sec-Fetch-Site',
+    'Sec-Fetch-User'
+  ]
 }));
 app.use(express.json());
+
+// Handle CORS preflight requests more comprehensively
+app.options('*', cors({
+  origin: getCorsOrigins(),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Cache-Control',
+    'Pragma',
+    'Expires',
+    'Accept',
+    'Accept-Language',
+    'Accept-Encoding',
+    'DNT',
+    'Connection',
+    'Upgrade-Insecure-Requests',
+    'User-Agent',
+    'Sec-Fetch-Dest',
+    'Sec-Fetch-Mode',
+    'Sec-Fetch-Site',
+    'Sec-Fetch-User'
+  ]
+}));
 
 // Serve static files from public directory (development only)
 if (process.env.NODE_ENV !== 'production') {
