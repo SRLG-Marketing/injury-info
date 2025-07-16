@@ -21,54 +21,14 @@ export class HubSpotInjuryInfoConnector {
    */
   async searchDiseases(query, category = null, limit = 10) {
     try {
-      // Search in HubSpot CMS pages/blog posts about diseases
-      const searchUrl = `${this.baseUrl}/cms/v3/pages/search`;
-      
-      const searchBody = {
-        query: query,
-        limit: limit,
-        contentTypes: ['landing-page', 'website-page', 'blog-post'],
-        // Filter by category if provided (you can use HubSpot tags/categories)
-        ...(category && { 
-          filters: [
-            {
-              propertyName: 'hs_blog_post_tags',
-              operator: 'CONTAINS_TOKEN',
-              value: category
-            }
-          ]
-        })
-      };
-
-      const response = await fetch(searchUrl, {
-        method: 'POST',
-        headers: this.headers,
-        body: JSON.stringify(searchBody)
-      });
-
-      if (!response.ok) {
-        throw new Error(`HubSpot API error: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      
-      // Transform HubSpot data to our expected format
-      return data.results.map(page => ({
-        id: page.id,
-        name: this.extractDiseaseNameFromTitle(page.name),
-        category: this.extractCategoryFromTags(page.tagList),
-        description: this.cleanHtmlContent(page.metaDescription || ''),
-        url: page.url,
-        lastUpdated: page.updatedAt,
-        // Extract structured data from page content
-        symptoms: this.extractSymptomsFromContent(page.postBody),
-        causes: this.extractCausesFromContent(page.postBody),
-        manufacturers: this.extractManufacturersFromContent(page.postBody)
-      }));
+      // For now, return empty array since CMS content may not be set up
+      // This prevents API errors while the HubSpot setup is in progress
+      console.log(`📋 HubSpot disease search not yet configured for query: ${query}`);
+      return [];
 
     } catch (error) {
       console.error('HubSpot disease search error:', error);
-      throw error;
+      return [];
     }
   }
 
@@ -77,69 +37,14 @@ export class HubSpotInjuryInfoConnector {
    */
   async findLawFirms(specialty, location = null, limit = 10) {
     try {
-      // Search companies in HubSpot CRM with law firm properties
-      const searchUrl = `${this.baseUrl}/crm/v3/objects/companies/search`;
-      
-      const filters = [
-        {
-          propertyName: 'industry',
-          operator: 'EQ',
-          value: 'Legal Services'
-        },
-        {
-          propertyName: 'law_firm_specialties', // Custom property you'll create
-          operator: 'CONTAINS_TOKEN',
-          value: specialty
-        }
-      ];
-
-      if (location) {
-        filters.push({
-          propertyName: 'city',
-          operator: 'CONTAINS_TOKEN',
-          value: location
-        });
-      }
-
-      const searchBody = {
-        filterGroups: [{ filters }],
-        properties: [
-          'name',
-          'city',
-          'state',
-          'phone',
-          'website',
-          'law_firm_specialties',
-          'years_of_experience',
-          'success_rate',
-          'notable_settlements'
-        ],
-        limit: limit
-      };
-
-      const response = await fetch(searchUrl, {
-        method: 'POST',
-        headers: this.headers,
-        body: JSON.stringify(searchBody)
-      });
-
-      const data = await response.json();
-
-      return data.results.map(company => ({
-        id: company.id,
-        name: company.properties.name,
-        location: `${company.properties.city}, ${company.properties.state}`,
-        phone: company.properties.phone,
-        website: company.properties.website,
-        specialties: company.properties.law_firm_specialties?.split(';') || [],
-        experience: company.properties.years_of_experience,
-        successRate: company.properties.success_rate,
-        notableSettlements: company.properties.notable_settlements?.split(';') || []
-      }));
+      // For now, return empty array since custom properties may not be set up
+      // This prevents API errors while the HubSpot setup is in progress
+      console.log(`📋 HubSpot law firm search not yet configured for specialty: ${specialty}`);
+      return [];
 
     } catch (error) {
       console.error('HubSpot law firm search error:', error);
-      throw error;
+      return [];
     }
   }
 
@@ -148,65 +53,14 @@ export class HubSpotInjuryInfoConnector {
    */
   async getManufacturerCases(manufacturer, product = null) {
     try {
-      // Use HubSpot custom objects to store manufacturer case data
-      const searchUrl = `${this.baseUrl}/crm/v3/objects/manufacturer_cases/search`;
-      
-      const filters = [
-        {
-          propertyName: 'manufacturer_name',
-          operator: 'CONTAINS_TOKEN',
-          value: manufacturer
-        }
-      ];
-
-      if (product) {
-        filters.push({
-          propertyName: 'product_name',
-          operator: 'CONTAINS_TOKEN',
-          value: product
-        });
-      }
-
-      const searchBody = {
-        filterGroups: [{ filters }],
-        properties: [
-          'manufacturer_name',
-          'product_name',
-          'allegation',
-          'case_status',
-          'total_settlements',
-          'total_cases',
-          'settlement_range_min',
-          'settlement_range_max'
-        ],
-        limit: 50
-      };
-
-      const response = await fetch(searchUrl, {
-        method: 'POST',
-        headers: this.headers,
-        body: JSON.stringify(searchBody)
-      });
-
-      const data = await response.json();
-
-      return data.results.map(case_ => ({
-        id: case_.id,
-        manufacturer: case_.properties.manufacturer_name,
-        product: case_.properties.product_name,
-        allegation: case_.properties.allegation,
-        status: case_.properties.case_status,
-        totalSettlements: case_.properties.total_settlements,
-        totalCases: case_.properties.total_cases,
-        settlementRange: {
-          min: case_.properties.settlement_range_min,
-          max: case_.properties.settlement_range_max
-        }
-      }));
+      // For now, return empty array since custom objects may not be set up
+      // This prevents API errors while the HubSpot setup is in progress
+      console.log(`📋 HubSpot manufacturer cases not yet configured for manufacturer: ${manufacturer}`);
+      return [];
 
     } catch (error) {
       console.error('HubSpot manufacturer case search error:', error);
-      throw error;
+      return [];
     }
   }
 
@@ -215,62 +69,14 @@ export class HubSpotInjuryInfoConnector {
    */
   async getSettlementData(condition, state = null) {
     try {
-      // Search for settlement data in HubSpot custom objects or CMS
-      const searchUrl = `${this.baseUrl}/crm/v3/objects/settlement_data/search`;
-      
-      const filters = [
-        {
-          propertyName: 'condition_name',
-          operator: 'EQ',
-          value: condition.toLowerCase()
-        }
-      ];
-
-      if (state) {
-        filters.push({
-          propertyName: 'applicable_states',
-          operator: 'CONTAINS_TOKEN',
-          value: state
-        });
-      }
-
-      const searchBody = {
-        filterGroups: [{ filters }],
-        properties: [
-          'condition_name',
-          'base_settlement_min',
-          'base_settlement_max',
-          'state_multiplier',
-          'severity_multipliers',
-          'last_updated'
-        ],
-        limit: 1
-      };
-
-      const response = await fetch(searchUrl, {
-        method: 'POST',
-        headers: this.headers,
-        body: JSON.stringify(searchBody)
-      });
-
-      const data = await response.json();
-
-      if (data.results.length > 0) {
-        const settlement = data.results[0].properties;
-        return {
-          min: parseInt(settlement.base_settlement_min),
-          max: parseInt(settlement.base_settlement_max),
-          stateMultiplier: parseFloat(settlement.state_multiplier) || 1.0,
-          severityMultipliers: JSON.parse(settlement.severity_multipliers || '{}')
-        };
-      }
-
-      // Fallback to default ranges if no specific data found
-      return this.getDefaultSettlementRanges(condition);
+      // For now, return empty array since custom objects may not be set up
+      // This prevents API errors while the HubSpot setup is in progress
+      console.log(`📋 HubSpot settlement data not yet configured for condition: ${condition}`);
+      return [];
 
     } catch (error) {
       console.error('HubSpot settlement data error:', error);
-      return this.getDefaultSettlementRanges(condition);
+      return [];
     }
   }
 

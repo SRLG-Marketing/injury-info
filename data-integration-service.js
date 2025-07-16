@@ -88,8 +88,8 @@ export class DataIntegrationService {
         try {
             const articles = [];
             
-            // Read from different sheets
-            const sheets = ['Medical Conditions', 'Legal Cases', 'Manufacturer Cases'];
+            // Read from different sheets - updated to match actual sheet names
+            const sheets = ['Top_10_Cases', 'Case_Amounts'];
             
             for (const sheetName of sheets) {
                 try {
@@ -155,51 +155,13 @@ export class DataIntegrationService {
     mapSheetRowToArticle(row, sheetName) {
         try {
             switch (sheetName) {
-                case 'Medical Conditions':
+                case 'Top_10_Cases':
                     return {
-                        id: `sheets_medical_${row.ID || Math.random()}`,
-                        title: row['Condition Name'] || row.Name || '',
-                        description: row.Description || row['Medical Description'] || '',
-                        slug: this.createSlug(row['Condition Name'] || row.Name || ''),
-                        category: 'medical',
-                        date: row['Last Updated'] || new Date().toISOString(),
-                        content: {
-                            overview: row.Description || row['Medical Description'] || '',
-                            symptoms: this.parseList(row.Symptoms || row['Common Symptoms'] || ''),
-                            causes: this.parseList(row.Causes || row['Risk Factors'] || ''),
-                            treatments: this.parseList(row.Treatments || row['Treatment Options'] || ''),
-                            legalOptions: this.parseList(row['Legal Options'] || ''),
-                            settlements: row.Settlements || row['Settlement Range'] || ''
-                        },
-                        source: 'google_sheets'
-                    };
-
-                case 'Legal Cases':
-                    return {
-                        id: `sheets_legal_${row.ID || Math.random()}`,
-                        title: row['Case Name'] || row.Name || '',
+                        id: `sheets_case_${row.ID || Math.random()}`,
+                        title: row['Case Name'] || row.Name || row['Case Type'] || '',
                         description: row.Description || row['Case Summary'] || '',
-                        slug: this.createSlug(row['Case Name'] || row.Name || ''),
+                        slug: this.createSlug(row['Case Name'] || row.Name || row['Case Type'] || ''),
                         category: 'legal',
-                        date: row['Date Filed'] || row['Last Updated'] || new Date().toISOString(),
-                        content: {
-                            overview: row.Description || row['Case Summary'] || '',
-                            symptoms: [],
-                            causes: this.parseList(row['Alleged Causes'] || ''),
-                            treatments: [],
-                            legalOptions: this.parseList(row['Legal Options'] || ''),
-                            settlements: row['Settlement Amount'] || row.Settlements || ''
-                        },
-                        source: 'google_sheets'
-                    };
-
-                case 'Manufacturer Cases':
-                    return {
-                        id: `sheets_manufacturer_${row.ID || Math.random()}`,
-                        title: `${row.Manufacturer || row.Company || ''} - ${row.Product || ''}`,
-                        description: row.Description || row['Case Summary'] || '',
-                        slug: this.createSlug(`${row.Manufacturer || row.Company || ''}-${row.Product || ''}`),
-                        category: 'manufacturer',
                         date: row['Date Filed'] || row['Last Updated'] || new Date().toISOString(),
                         content: {
                             overview: row.Description || row['Case Summary'] || '',
@@ -208,6 +170,25 @@ export class DataIntegrationService {
                             treatments: [],
                             legalOptions: this.parseList(row['Legal Options'] || ''),
                             settlements: row['Settlement Amount'] || row.Settlements || ''
+                        },
+                        source: 'google_sheets'
+                    };
+
+                case 'Case_Amounts':
+                    return {
+                        id: `sheets_settlement_${row.ID || Math.random()}`,
+                        title: row['Case Type'] || row.Name || '',
+                        description: row.Description || row['Case Summary'] || '',
+                        slug: this.createSlug(row['Case Type'] || row.Name || ''),
+                        category: 'settlement',
+                        date: row['Date'] || row['Last Updated'] || new Date().toISOString(),
+                        content: {
+                            overview: row.Description || row['Case Summary'] || '',
+                            symptoms: [],
+                            causes: [],
+                            treatments: [],
+                            legalOptions: [],
+                            settlements: row['Settlement Amount'] || row['Amount'] || row.Settlements || ''
                         },
                         source: 'google_sheets'
                     };
@@ -276,7 +257,7 @@ export class DataIntegrationService {
         }
         
         try {
-            const { data } = await this.googleSheets.readSheet('Law Firms');
+            const { data } = await this.googleSheets.readSheet('Top_10_Firms');
             
             return data
                 .filter(firm => {
@@ -381,7 +362,7 @@ export class DataIntegrationService {
         }
         
         try {
-            const { data } = await this.googleSheets.searchSheet('Settlements', condition, 'Condition', 20);
+            const { data } = await this.googleSheets.searchSheet('Case_Amounts', condition, 'Case Type', 20);
             
             return data
                 .filter(row => !state || row.State?.toLowerCase().includes(state.toLowerCase()))
@@ -879,6 +860,85 @@ export class DataIntegrationService {
     }
 
     /**
+     * Generate keywords from case name for better matching
+     */
+    generateKeywordsFromCaseName(caseName) {
+        if (!caseName) return [];
+        
+        const keywords = [caseName.toLowerCase()];
+        
+        // Add common variations and related terms - more specific to prevent cross-contamination
+        const caseVariations = {
+            'roundup': ['glyphosate', 'weed killer', 'herbicide', 'monsanto', 'bayer'],
+            'hair relaxer': ['hair straightener', 'chemical straightener', 'relaxer', 'uterine cancer'],
+            'mesothelioma': ['asbestos', 'asbestos exposure', 'pleural mesothelioma', 'peritoneal mesothelioma'],
+            'pfas': ['forever chemicals', 'water contamination', 'pfas chemicals', 'perfluoroalkyl', 'pfoa', 'pfos'],
+            'depo-provera': ['birth control', 'contraceptive', 'medroxyprogesterone'],
+            'necrotizing enterocolitis': ['nec', 'premature baby', 'intestinal disease'],
+            'paraquat': ['herbicide', 'weed killer', 'parkinson\'s disease', 'parkinsons'],
+            'talcum powder': ['talc', 'baby powder', 'ovarian cancer', 'johnson & johnson', 'johnson and johnson'],
+            'camp lejeune': ['camp lejeune', 'water contamination', 'military base', 'marine corps'],
+            'afff': ['firefighting foam', 'pfas', 'firefighter', 'military foam']
+        };
+        
+        const lowerCaseName = caseName.toLowerCase();
+        
+        // Add specific variations for known cases - only if there's a direct match
+        for (const [key, variations] of Object.entries(caseVariations)) {
+            if (lowerCaseName === key || lowerCaseName.includes(key)) {
+                keywords.push(...variations);
+                break; // Only match one case type to prevent cross-contamination
+            }
+        }
+        
+        // Add individual words from case name
+        const words = caseName.toLowerCase().split(/\s+/);
+        keywords.push(...words);
+        
+        // Remove duplicates and empty strings
+        return [...new Set(keywords)].filter(k => k.length > 0);
+    }
+
+    /**
+     * Parse the Active field from various formats
+     */
+    parseActiveField(activeValue) {
+        if (!activeValue) return true; // Default to true if no value provided
+        
+        const value = activeValue.toString().toLowerCase().trim();
+        
+        // Handle boolean values
+        if (value === 'true' || value === 'yes' || value === '1' || value === 'active') {
+            return true;
+        }
+        
+        // Handle false values
+        if (value === 'false' || value === 'no' || value === '0' || value === 'inactive') {
+            return false;
+        }
+        
+        // Default to true for any other value
+        return true;
+    }
+
+    /**
+     * Check if a row looks like a header row
+     */
+    isHeaderRow(row) {
+        if (!row || row.length === 0) return false;
+        
+        const firstCell = row[0]?.toString().toLowerCase() || '';
+        
+        // Common header indicators
+        const headerIndicators = [
+            'case type', 'name', 'title', 'header', 'column', 'field',
+            'case', 'type', 'description', 'status', 'active', 'keywords'
+        ];
+        
+        return headerIndicators.some(indicator => firstCell.includes(indicator));
+    }
+
+    /**
      * Get LIA Active Cases from Google Sheets
      */
     async getLIAActiveCases() {
@@ -893,56 +953,99 @@ export class DataIntegrationService {
 
         try {
             console.log('📊 Fetching LIA Active Cases from Google Sheets...');
-            const { data } = await this.googleSheets.readSheet('Legal Injury Advocates Active cases');
+            const { data, headers } = await this.googleSheets.readSheet('Legal Injury Advocates Active cases');
+            
+            console.log('📋 Sheet headers:', headers);
+            console.log('📋 First few rows:', data.slice(0, 3));
             
             if (!data || data.length === 0) {
                 console.log('⚠️ No LIA active cases found in Google Sheets, using fallback');
                 return this.getFallbackLIACases();
             }
 
-            const activeCases = data
+            // Handle case list structure with Active field
+            let activeCases = data
                 .filter(row => {
-                    // Check if case is active (supports various column names)
-                    const active = row.Active || row.Status || row.active || row.status || '';
-                    return active.toString().toLowerCase() === 'true' || 
-                           active.toString().toLowerCase() === 'active' || 
-                           active.toString().toLowerCase() === 'yes' || 
-                           active.toString().toLowerCase() === '1';
+                    // Check if row has a case name
+                    const caseName = row['Case Type'] || row.Name || row.name || row[Object.keys(row)[0]] || '';
+                    if (!caseName || caseName.trim().length === 0) return false;
+                    
+                    // Check if the case is marked as active
+                    const isActive = this.parseActiveField(row['Active'] || row.active || row['Status'] || row.status || 'true');
+                    return isActive;
                 })
                 .map(row => {
-                    // Parse keywords from the row
-                    const keywordsText = row.Keywords || row.keywords || row['Key Words'] || row['Search Terms'] || '';
-                    const keywords = keywordsText.split(',').map(k => k.trim()).filter(k => k.length > 0);
+                    // Get case name from first column or named column
+                    const caseName = row['Case Type'] || row.Name || row.name || row[Object.keys(row)[0]] || '';
+                    
+                    // Generate keywords from case name
+                    const keywords = this.generateKeywordsFromCaseName(caseName);
                     
                     return {
-                        caseType: this.createSlug(row['Case Type'] || row.Name || row.name || ''),
-                        name: row['Case Type'] || row.Name || row.name || '',
-                        description: row.Description || row.description || `${row['Case Type'] || row.Name || 'Unknown'} cases`,
+                        caseType: this.createSlug(caseName),
+                        name: caseName,
+                        description: row['Description'] || `${caseName} cases`,
                         keywords: keywords,
                         active: true,
-                        lastUpdated: row['Last Updated'] || row.lastUpdated || new Date().toISOString(),
+                        lastUpdated: row['Last Updated'] || new Date().toISOString(),
                         source: 'google_sheets'
                     };
                 });
 
+            // If no cases found with headers, try reading raw data
+            if (activeCases.length === 0 && headers.length > 0) {
+                console.log('🔄 No cases found with headers, trying raw data approach...');
+                
+                // Get the raw values from the sheet
+                const rawData = await this.googleSheets.makeRequest(`/${this.googleSheets.spreadsheetId}/values/Legal Injury Advocates Active cases`);
+                
+                if (rawData.values && rawData.values.length > 0) {
+                    // Skip first row if it looks like a header, otherwise use all rows
+                    const startRow = this.isHeaderRow(rawData.values[0]) ? 1 : 0;
+                    
+                    activeCases = rawData.values.slice(startRow)
+                        .filter(row => {
+                            // Check if first column has data
+                            if (!row[0] || row[0].trim().length === 0) return false;
+                            
+                            // Check if the case is marked as active (assuming Active is in column 2, or default to true)
+                            const activeValue = row[1] || 'true'; // Column B for Active field
+                            const isActive = this.parseActiveField(activeValue);
+                            return isActive;
+                        })
+                        .map(row => {
+                            const caseName = row[0]; // First column contains case names
+                            const keywords = this.generateKeywordsFromCaseName(caseName);
+                            
+                            return {
+                                caseType: this.createSlug(caseName),
+                                name: caseName,
+                                description: row[2] || `${caseName} cases`, // Column C for Description
+                                keywords: keywords,
+                                active: true,
+                                lastUpdated: row[3] || new Date().toISOString(), // Column D for Last Updated
+                                source: 'google_sheets'
+                            };
+                        });
+                    
+                    console.log(`✅ Found ${activeCases.length} cases using raw data approach`);
+                }
+            }
+
             // Also include all cases (active and inactive) for admin purposes
             const allCases = data.map(row => {
-                const active = row.Active || row.Status || row.active || row.status || '';
-                const isActive = active.toString().toLowerCase() === 'true' || 
-                               active.toString().toLowerCase() === 'active' || 
-                               active.toString().toLowerCase() === 'yes' || 
-                               active.toString().toLowerCase() === '1';
+                const caseName = row['Case Type'] || row.Name || row.name || row[Object.keys(row)[0]] || '';
+                const isActive = this.parseActiveField(row['Active'] || row.active || row['Status'] || row.status || 'true');
                 
-                const keywordsText = row.Keywords || row.keywords || row['Key Words'] || row['Search Terms'] || '';
-                const keywords = keywordsText.split(',').map(k => k.trim()).filter(k => k.length > 0);
+                const keywords = this.generateKeywordsFromCaseName(caseName);
                 
                 return {
-                    caseType: this.createSlug(row['Case Type'] || row.Name || row.name || ''),
-                    name: row['Case Type'] || row.Name || row.name || '',
-                    description: row.Description || row.description || `${row['Case Type'] || row.Name || 'Unknown'} cases`,
+                    caseType: this.createSlug(caseName),
+                    name: caseName,
+                    description: row['Description'] || `${caseName} cases`,
                     keywords: keywords,
                     active: isActive,
-                    lastUpdated: row['Last Updated'] || row.lastUpdated || new Date().toISOString(),
+                    lastUpdated: row['Last Updated'] || new Date().toISOString(),
                     source: 'google_sheets'
                 };
             });
@@ -975,19 +1078,32 @@ export class DataIntegrationService {
             const liaData = await this.getLIAActiveCases();
             const lowerQuery = query.toLowerCase();
             
+            console.log(`🔍 Checking LIA active case for query: "${query}"`);
+            console.log(`📋 Available active cases:`, liaData.activeCases.map(c => `${c.name} (${c.caseType})`));
+            
             for (const caseInfo of liaData.activeCases) {
-                if (caseInfo.keywords.some(keyword => lowerQuery.includes(keyword.toLowerCase()))) {
+                // Check if any of the case keywords are present in the query
+                const matchingKeywords = caseInfo.keywords.filter(keyword => 
+                    lowerQuery.includes(keyword.toLowerCase())
+                );
+                
+                if (matchingKeywords.length > 0) {
+                    console.log(`✅ Query matches case "${caseInfo.name}" with keywords: ${matchingKeywords.join(', ')}`);
+                    console.log(`📝 Case description: ${caseInfo.description}`);
+                    
                     return {
                         isActive: true,
                         caseType: caseInfo.caseType,
                         name: caseInfo.name,
                         description: caseInfo.description,
                         keywords: caseInfo.keywords,
-                        lastUpdated: caseInfo.lastUpdated
+                        lastUpdated: caseInfo.lastUpdated,
+                        matchedKeywords: matchingKeywords
                     };
                 }
             }
             
+            console.log(`❌ No active LIA case matches found for query: "${query}"`);
             return { isActive: false };
         } catch (error) {
             console.error('❌ Error checking LIA active case:', error);
@@ -1004,7 +1120,7 @@ export class DataIntegrationService {
                 caseType: 'mesothelioma',
                 name: 'Mesothelioma',
                 description: 'Mesothelioma and asbestos exposure cases',
-                keywords: ['mesothelioma', 'asbestos', 'asbestos exposure'],
+                keywords: ['mesothelioma', 'asbestos', 'asbestos exposure', 'pleural mesothelioma'],
                 active: true,
                 lastUpdated: new Date().toISOString(),
                 source: 'fallback'
@@ -1013,17 +1129,26 @@ export class DataIntegrationService {
                 caseType: 'talcum_powder',
                 name: 'Talcum Powder',
                 description: 'Talcum powder ovarian cancer cases',
-                keywords: ['talcum powder', 'talc', 'baby powder', 'ovarian cancer'],
+                keywords: ['talcum powder', 'talc', 'baby powder', 'ovarian cancer', 'johnson & johnson'],
                 active: true,
+                lastUpdated: new Date().toISOString(),
+                source: 'fallback'
+            },
+            {
+                caseType: 'pfas',
+                name: 'PFAS/Forever Chemicals',
+                description: 'PFAS and forever chemicals in water contamination cases',
+                keywords: ['pfas', 'forever chemicals', 'water contamination', 'pfoa', 'pfos', 'perfluoroalkyl'],
+                active: false, // Set to false by default - only activate if LIA actually handles these
                 lastUpdated: new Date().toISOString(),
                 source: 'fallback'
             }
         ];
 
         return {
-            activeCases: fallbackCases,
+            activeCases: fallbackCases.filter(caseInfo => caseInfo.active),
             allCases: fallbackCases,
-            totalActive: fallbackCases.length,
+            totalActive: fallbackCases.filter(caseInfo => caseInfo.active).length,
             totalCases: fallbackCases.length,
             lastUpdated: new Date().toISOString(),
             source: 'fallback'

@@ -6,6 +6,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { SERVER_AI_CONFIG, createOpenAIRequest, getServerErrorMessage, validateConfiguration, getConfigurationStatus } from './server-ai-config.js';
 import { DataIntegrationService } from './data-integration-service.js';
+import { DataVerificationMiddleware } from './data-verification-middleware.js';
+import { getBaseUrl, getApiBaseUrl } from './utils/url-helper.js';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -23,6 +25,9 @@ const openai = new OpenAI({
 
 // Initialize Data Integration Service
 const dataService = new DataIntegrationService();
+
+// Initialize Data Verification Middleware
+const verificationMiddleware = new DataVerificationMiddleware();
 
 // Middleware
 app.use(cors());
@@ -43,22 +48,81 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    console.log('Received chat request:', { message, systemMessage: systemMessage?.substring(0, 100) + '...' });
+    // Get the base URL from the request
+    const baseUrl = getBaseUrl(req);
+    const apiBaseUrl = getApiBaseUrl(req);
+
+    console.log('Received chat request:', { 
+      message, 
+      systemMessage: systemMessage?.substring(0, 100) + '...',
+      baseUrl,
+      apiBaseUrl
+    });
+
+    // Get relevant data for context
+    let contextData = [];
+    let liaCaseInfo = null;
+    try {
+      const articles = await dataService.searchArticles(message);
+      const settlements = await dataService.getSettlementData(message);
+      const lawFirms = await dataService.getLawFirms();
+      
+      // Check if this query relates to an LIA active case
+      liaCaseInfo = await dataService.checkLIAActiveCase(message);
+      
+      contextData = [
+        ...articles.slice(0, 3), // Top 3 relevant articles
+        ...settlements.slice(0, 2), // Top 2 settlement data
+        ...lawFirms.slice(0, 2) // Top 2 law firms
+      ];
+    } catch (error) {
+      console.warn('Could not fetch context data:', error.message);
+    }
 
     // Prepare messages for OpenAI
     const messages = [];
     
-    if (systemMessage) {
+    // Use LIA-specific system message if this is an active case
+    if (liaCaseInfo && liaCaseInfo.isActive) {
+      messages.push({
+        role: 'system',
+        content: SERVER_AI_CONFIG.systemMessages.liaActiveCase(liaCaseInfo)
+      });
+    } else if (systemMessage) {
       messages.push({
         role: 'system',
         content: systemMessage
       });
     }
 
-    messages.push({
-      role: 'user',
-      content: message
-    });
+    // Add context data if available
+    if (contextData.length > 0 || liaCaseInfo) {
+      let contextMessage = '';
+      
+      if (contextData.length > 0) {
+        contextMessage += `RELEVANT DATA FROM OUR DATABASE:\n${JSON.stringify(contextData, null, 2)}\n\n`;
+      }
+      
+      if (liaCaseInfo && liaCaseInfo.isActive) {
+        contextMessage += `LIA ACTIVE CASE DETECTED:\nLegal Injury Advocates is currently handling ${liaCaseInfo.name} cases.\nCase Type: ${liaCaseInfo.caseType}\nDescription: ${liaCaseInfo.description}\nKeywords: ${liaCaseInfo.keywords.join(', ')}\n\n`;
+        contextMessage += `CRITICAL: Since this relates to an active LIA case, you MUST mention that users can start their claim at legalinjuryadvocates.com.`;
+      } else {
+        contextMessage += `NO ACTIVE LIA CASE DETECTED:\nThis condition is NOT currently handled by Legal Injury Advocates.\n\n`;
+        contextMessage += `CRITICAL: Do NOT mention Legal Injury Advocates or any legal referrals. Only provide general information about the condition.`;
+      }
+      
+      contextMessage += `\n\nUser Question: ${message}\n\nIMPORTANT: Only use information from the provided data or explicitly state when you don't have specific information.`;
+      
+      messages.push({
+        role: 'user',
+        content: contextMessage
+      });
+    } else {
+      messages.push({
+        role: 'user',
+        content: message
+      });
+    }
 
     // Call OpenAI API using centralized configuration
     // Remove systemMessage from options since it's already handled in messages
@@ -66,11 +130,25 @@ app.post('/api/chat', async (req, res) => {
     const openAIRequest = createOpenAIRequest(messages, openAIOptions);
     const completion = await openai.chat.completions.create(openAIRequest);
 
-    const response = completion.choices[0].message.content;
-    console.log('OpenAI response received:', response.substring(0, 100) + '...');
+    const aiResponse = completion.choices[0].message.content;
+    console.log('OpenAI response received:', aiResponse.substring(0, 100) + '...');
 
+    // Verify response against data sources
+    const verification = await verificationMiddleware.verifyResponse(aiResponse, message);
+    
     res.json({ 
-      response,
+      response: verification.response,
+      verified: verification.verified,
+      warnings: verification.warnings,
+      claimsVerified: verification.claimsVerified,
+      liaCase: liaCaseInfo && liaCaseInfo.isActive ? {
+        isActive: true,
+        caseType: liaCaseInfo.caseType,
+        name: liaCaseInfo.name,
+        description: liaCaseInfo.description,
+        keywords: liaCaseInfo.keywords
+      } : null,
+      apiBaseUrl: apiBaseUrl,
       usage: completion.usage 
     });
 
@@ -212,6 +290,9 @@ app.get('/api/test', async (req, res) => {
 app.get('/api/config/status', (req, res) => {
   try {
     const status = getConfigurationStatus();
+    const baseUrl = getBaseUrl(req);
+    const apiBaseUrl = getApiBaseUrl(req);
+    
     console.log('📊 Configuration status requested');
     
     // Don't expose sensitive information like API keys
@@ -228,7 +309,29 @@ app.get('/api/config/status', (req, res) => {
         configured: status.hubspot.configured,
         portalId: status.hubspot.portalId
       },
-      validation: status.validation
+      validation: status.validation,
+      verification: {
+        enabled: true,
+        features: [
+          'Response verification against data sources',
+          'Claim extraction and validation',
+          'Source citation',
+          'Unverified claim removal'
+        ]
+      },
+      lia: {
+        enabled: true,
+        features: [
+          'Automatic LIA case detection',
+          'Active case prompting',
+          'legalinjuryadvocates.com referrals'
+        ]
+      },
+      urls: {
+        baseUrl,
+        apiBaseUrl,
+        environment: process.env.NODE_ENV || 'development'
+      }
     };
     
     res.json(safeStatus);
@@ -277,6 +380,37 @@ app.post('/api/lia/check-case', async (req, res) => {
   }
 });
 
+// API endpoint to verify if an article exists
+app.post('/api/verify-article', async (req, res) => {
+  try {
+    const { articleTitle } = req.body;
+    
+    if (!articleTitle) {
+      return res.status(400).json({ error: 'Article title is required' });
+    }
+    
+    console.log(`🔍 Verifying article: "${articleTitle}"`);
+    const verification = await verificationMiddleware.verifyArticleExists(articleTitle);
+    
+    res.json({
+      articleTitle,
+      exists: verification.exists,
+      similarity: verification.similarity,
+      article: verification.article ? {
+        id: verification.article.id,
+        title: verification.article.title,
+        slug: verification.article.slug,
+        category: verification.article.category,
+        source: verification.article.source
+      } : null,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Error verifying article:', error);
+    res.status(500).json({ error: 'Failed to verify article' });
+  }
+});
+
 // Serve the main HTML file (development only)
 if (process.env.NODE_ENV !== 'production') {
   app.get('/', (req, res) => {
@@ -316,7 +450,7 @@ app.listen(port, () => {
   
   console.log('📊 Available endpoints:');
   console.log('   GET  /api/config/status - Configuration status');
-  console.log('   POST /api/chat - OpenAI chat');
+  console.log('   POST /api/chat - OpenAI chat (with verification)');
   console.log('   GET  /api/articles - Get all articles');
   console.log('   GET  /api/articles/:slug - Get specific article');
   console.log('   GET  /api/law-firms - Search law firms');
@@ -326,6 +460,7 @@ app.listen(port, () => {
   console.log('   GET  /api/test - Test OpenAI connection');
   console.log('   GET  /api/lia/active-cases - Get LIA active cases');
   console.log('   POST /api/lia/check-case - Check if a query relates to LIA active cases');
+  console.log('   POST /api/verify-article - Verify if an article exists');
 });
 
 export default app; 

@@ -176,35 +176,46 @@ export class GoogleSheetsConnector {
 
   mapToHubSpotFormat(sheetName, row) {
     switch (sheetName.toLowerCase()) {
-      case 'law firms':
+      case 'top_10_firms':
         return {
           objectType: 'companies',
           properties: {
-            name: row.Name || '',
+            name: row.Name || row['Firm Name'] || '',
             phone: row.Phone || '',
             email: row.Email || '',
             city: row.City || '',
             state: row.State || '',
+            location: row.Location || '',
             success_rate: parseInt(row['Success Rate']) || 0,
-            years_experience: parseInt(row['Years Experience']) || 0,
-            contingency_fee: parseInt(row['Contingency Fee']) || 0
+            years_experience: parseInt(row['Years Experience']) || parseInt(row.Experience) || 0,
+            specialties: row.Specialties || '',
+            notable_settlements: row['Notable Settlements'] || ''
           }
         };
         
-      case 'manufacturer cases':
+      case 'top_10_cases':
         return {
           objectType: 'notes',
           properties: {
-            hs_note_body: `Manufacturer: ${row.Company}\nProduct: ${row.Product}\nInjury: ${row['Injury Type']}\nSettlement: ${row['Settlement Amount']}\nYear: ${row.Year}\nStatus: ${row.Status}`,
+            hs_note_body: `Case Name: ${row['Case Name'] || row.Name || row['Case Type']}\nDescription: ${row.Description || row['Case Summary']}\nSettlement: ${row['Settlement Amount'] || row.Settlements}\nDate Filed: ${row['Date Filed']}\nStatus: ${row.Status}`,
             hs_timestamp: new Date().toISOString()
           }
         };
         
-      case 'medical information':
+      case 'case_amounts':
         return {
           objectType: 'notes',
           properties: {
-            hs_note_body: `Condition: ${row.Condition}\nSymptoms: ${row.Symptoms}\nTreatments: ${row.Treatments}\nLegal Considerations: ${row['Legal Considerations']}\nAverage Settlement: ${row['Average Settlement']}`,
+            hs_note_body: `Case Type: ${row['Case Type']}\nCondition: ${row.Condition}\nSettlement Range: ${row['Settlement Range']}\nAverage Settlement: ${row['Average Settlement']}\nTotal Cases: ${row['Total Cases']}\nYear: ${row.Year}`,
+            hs_timestamp: new Date().toISOString()
+          }
+        };
+        
+      case 'legal injury advocates active cases':
+        return {
+          objectType: 'notes',
+          properties: {
+            hs_note_body: `Case Type: ${row['Case Type']}\nDescription: ${row.Description}\nKeywords: ${row.Keywords}\nActive: ${row.Active}\nLast Updated: ${row['Last Updated']}`,
             hs_timestamp: new Date().toISOString()
           }
         };
