@@ -362,19 +362,41 @@ export class DataIntegrationService {
         }
         
         try {
-            const { data } = await this.googleSheets.searchSheet('Case_Amounts', condition, 'Case Type', 20);
+            const { results } = await this.googleSheets.searchSheet('Case_Amounts', condition, 'Case Type', 20);
             
-            return data
-                .filter(row => !state || row.State?.toLowerCase().includes(state.toLowerCase()))
-                .map(row => ({
-                    condition: row.Condition || '',
-                    state: row.State || '',
-                    settlementRange: row['Settlement Range'] || row.Settlements || '',
-                    averageSettlement: row['Average Settlement'] || '',
-                    totalCases: row['Total Cases'] || '',
-                    year: row.Year || '',
-                    source: 'google_sheets'
-                }));
+            return results
+                .map(row => {
+                    // Handle the user's existing structure: Case Type, Settlement_Amount_USD, Source_Link
+                    const settlementAmount = row['Settlement_Amount_USD'] || row['Settlement Amount USD'] || row['Settlement Amount'] || '';
+                    
+                    // Format the settlement amount for display
+                    let formattedAmount = '';
+                    if (settlementAmount) {
+                        const amount = parseFloat(settlementAmount.replace(/[^0-9.]/g, ''));
+                        if (!isNaN(amount)) {
+                            if (amount >= 1000000000) {
+                                formattedAmount = `$${(amount / 1000000000).toFixed(1)} billion`;
+                            } else if (amount >= 1000000) {
+                                formattedAmount = `$${(amount / 1000000).toFixed(1)} million`;
+                            } else if (amount >= 1000) {
+                                formattedAmount = `$${(amount / 1000).toFixed(0)}K`;
+                            } else {
+                                formattedAmount = `$${amount.toLocaleString()}`;
+                            }
+                        }
+                    }
+                    
+                    return {
+                        condition: row['Case Type'] || '',
+                        state: 'All', // Default since no state column in current structure
+                        settlementRange: formattedAmount || 'Varies by case',
+                        averageSettlement: formattedAmount || 'Contact attorney for estimate',
+                        totalCases: 'Varies', // Default since no total cases column
+                        year: '2024', // Default year
+                        source: 'google_sheets',
+                        sourceLink: row['Source_Link'] || row['Source Link'] || ''
+                    };
+                });
         } catch (error) {
             console.error('❌ Error reading settlements from sheets:', error);
             return [];
@@ -517,6 +539,18 @@ export class DataIntegrationService {
     }
 
     getDefaultSettlementData(condition) {
+        // Handle undefined or null condition
+        if (!condition) {
+            return [{
+                condition: 'Unknown',
+                settlementRange: 'Varies by case',
+                averageSettlement: 'Contact attorney for estimate',
+                totalCases: 'Varies',
+                year: '2024',
+                source: 'fallback'
+            }];
+        }
+        
         const defaults = {
             'mesothelioma': { 
                 condition: 'Mesothelioma',
@@ -1076,19 +1110,33 @@ export class DataIntegrationService {
     async checkLIAActiveCase(query) {
         try {
             const liaData = await this.getLIAActiveCases();
-            const lowerQuery = query.toLowerCase();
+            
+            // Normalize the query: split into words, remove punctuation, lowercase
+            const queryWords = query.toLowerCase()
+                .replace(/[^\w\s]/g, ' ') // Replace punctuation with spaces
+                .split(/\s+/) // Split on whitespace
+                .filter(word => word.length > 0); // Remove empty strings
             
             console.log(`🔍 Checking LIA active case for query: "${query}"`);
+            console.log(`📋 Query words: [${queryWords.join(', ')}]`);
             console.log(`📋 Available active cases:`, liaData.activeCases.map(c => `${c.name} (${c.caseType})`));
             
             for (const caseInfo of liaData.activeCases) {
-                // Check if any of the case keywords are present in the query
-                const matchingKeywords = caseInfo.keywords.filter(keyword => 
-                    lowerQuery.includes(keyword.toLowerCase())
+                // Split case keywords into individual words/phrases
+                const caseKeywords = caseInfo.keywords.flatMap(keyword => {
+                    return keyword.toLowerCase()
+                        .replace(/[^\w\s]/g, ' ') // Replace punctuation with spaces
+                        .split(/\s+/) // Split on whitespace
+                        .filter(word => word.length > 0); // Remove empty strings
+                });
+                
+                // Check for exact word matches (not substring matches)
+                const matchingKeywords = caseKeywords.filter(keyword => 
+                    queryWords.includes(keyword)
                 );
                 
                 if (matchingKeywords.length > 0) {
-                    console.log(`✅ Query matches case "${caseInfo.name}" with keywords: ${matchingKeywords.join(', ')}`);
+                    console.log(`✅ Query matches case "${caseInfo.name}" with exact keywords: ${matchingKeywords.join(', ')}`);
                     console.log(`📝 Case description: ${caseInfo.description}`);
                     
                     return {

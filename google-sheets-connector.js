@@ -66,6 +66,17 @@ export class GoogleSheetsConnector {
       return { results: [], total: 0 };
     }
     
+    // Handle empty or undefined query - return all data
+    if (!query || query.trim() === '') {
+      const results = data.slice(0, limit);
+      return {
+        results,
+        total: data.length,
+        query: '',
+        column: column || 'all'
+      };
+    }
+    
     const searchQuery = query.toLowerCase();
     let filteredData = data;
     
@@ -83,7 +94,7 @@ export class GoogleSheetsConnector {
       // Search across all columns
       filteredData = data.filter(row => {
         return Object.values(row).some(value => 
-          value.toLowerCase().includes(searchQuery)
+          (value || '').toLowerCase().includes(searchQuery)
         );
       });
     }
