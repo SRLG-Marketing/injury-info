@@ -91,7 +91,7 @@ Please provide helpful, accurate information based on this specific article and 
 
 Be empathetic and informative, but always recommend consulting with qualified medical professionals or attorneys for specific situations. Keep your response concise (1-2 paragraphs or a short list).
 
-IMPORTANT: If the user asks about legal options, filing claims, consulting attorneys, or seeking legal advice, mention that they can start their claim at legalinjuryadvocates.com.
+IMPORTANT: Do NOT mention Legal Injury Advocates or any law firms in your main response. The system will automatically add legal referrals when appropriate.
 
 When relevant to the user's query, reference helpful articles from our site by mentioning specific topics naturally in your response.`,
 

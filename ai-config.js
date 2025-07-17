@@ -343,12 +343,8 @@ export async function shouldIncludeLegalReferral(text) {
 
 // Helper function to add legal referral to response
 export async function addLegalReferralIfNeeded(text) {
-    const liaCheck = await isLIAActiveCase(text);
-    
-    if (liaCheck.isActive && await shouldIncludeLegalReferral(text)) {
-        return text + `<br><br><strong>➡️ Legal Injury Advocates is currently handling ${liaCheck.description.toLowerCase()}. You can start your claim at <a href="https://legalinjuryadvocates.com" target="_blank">legalinjuryadvocates.com</a>.</strong>`;
-    }
-    
+    // The server now handles all LIA case detection and messaging
+    // This function is kept for backward compatibility but no longer adds messages
     return text;
 }
 

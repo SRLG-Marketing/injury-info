@@ -154,6 +154,7 @@ app.post('/api/chat', async (req, res) => {
     // Get relevant data for context
     let contextData = [];
     let liaCaseInfo = null;
+    let reputableSources = [];
     try {
       const articles = await dataService.searchArticles(message);
       const settlements = await dataService.getSettlementData(message);
@@ -161,6 +162,9 @@ app.post('/api/chat', async (req, res) => {
       
       // Check if this query relates to an LIA active case
       liaCaseInfo = await dataService.checkLIAActiveCase(message);
+      
+      // Get reputable sources for the query
+      reputableSources = await dataService.getReputableSources(message, 3);
       
       contextData = [
         ...articles.slice(0, 3), // Top 3 relevant articles
@@ -180,10 +184,11 @@ app.post('/api/chat', async (req, res) => {
         role: 'system',
         content: SERVER_AI_CONFIG.systemMessages.liaActiveCase(liaCaseInfo)
       });
-    } else if (systemMessage) {
+    } else {
+      // Use the general system message to prevent unwanted legal referrals
       messages.push({
         role: 'system',
-        content: systemMessage
+        content: SERVER_AI_CONFIG.systemMessages.general
       });
     }
 
@@ -229,13 +234,23 @@ app.post('/api/chat', async (req, res) => {
     const verification = await verificationMiddleware.verifyResponse(aiResponse, message);
     
     // Add reputable sources to the response
-    const responseWithSources = await addSourcesToResponse(message, verification.response);
+    let responseWithSources = verification.response;
+    if (reputableSources.length > 0) {
+      const sourcesText = dataService.formatReputableSourcesForResponse(reputableSources);
+      responseWithSources += sourcesText;
+    }
     
     res.json({ 
       response: responseWithSources,
       verified: verification.verified,
       warnings: verification.warnings,
       claimsVerified: verification.claimsVerified,
+      reputableSources: reputableSources.map(source => ({
+        title: source.sourceTitle,
+        url: source.sourceUrl,
+        type: source.sourceType,
+        priority: source.priority
+      })),
       liaCase: liaCaseInfo && liaCaseInfo.isActive ? {
         isActive: true,
         caseType: liaCaseInfo.caseType,
@@ -342,6 +357,47 @@ app.get('/api/search/:condition', async (req, res) => {
   } catch (error) {
     console.error('❌ Error searching condition:', error);
     res.status(500).json({ error: 'Failed to search condition' });
+  }
+});
+
+// API endpoint to get reputable sources for a query
+app.get('/api/reputable-sources', async (req, res) => {
+  try {
+    const { query, disease, limit = 3 } = req.query;
+    
+    if (!query && !disease) {
+      return res.status(400).json({ error: 'Either query or disease parameter is required' });
+    }
+    
+    let sources = [];
+    
+    if (query) {
+      console.log(`📚 Fetching reputable sources for query: "${query}"`);
+      sources = await dataService.getReputableSources(query, parseInt(limit));
+    } else if (disease) {
+      console.log(`📚 Fetching reputable sources for disease: "${disease}"`);
+      sources = await dataService.getReputableSourcesForDisease(disease, parseInt(limit));
+    }
+    
+    console.log(`✅ Found ${sources.length} reputable sources`);
+    
+    res.json({
+      sources: sources.map(source => ({
+        id: source.id,
+        diseaseAilment: source.diseaseAilment,
+        sourceTitle: source.sourceTitle,
+        sourceUrl: source.sourceUrl,
+        sourceType: source.sourceType,
+        priority: source.priority,
+        description: source.description,
+        lastUpdated: source.lastUpdated
+      })),
+      total: sources.length,
+      query: query || disease
+    });
+  } catch (error) {
+    console.error('❌ Error fetching reputable sources:', error);
+    res.status(500).json({ error: 'Failed to fetch reputable sources' });
   }
 });
 

@@ -6,6 +6,7 @@
 
 import { HubSpotInjuryInfoConnector } from './hubspot-connector.js';
 import { GoogleSheetsConnector } from './google-sheets-connector.js';
+import { ReputableSourcesService } from './reputable-sources-service.js';
 
 export class DataIntegrationService {
     constructor() {
@@ -30,6 +31,17 @@ export class DataIntegrationService {
         } catch (error) {
             console.warn('⚠️ Google Sheets connector failed to initialize:', error.message);
             this.googleSheets = null;
+        }
+
+        // Initialize reputable sources service
+        try {
+            this.reputableSources = new ReputableSourcesService({
+                googleSheets: this.googleSheets
+            });
+            console.log('✅ Reputable sources service initialized');
+        } catch (error) {
+            console.warn('⚠️ Reputable sources service failed to initialize:', error.message);
+            this.reputableSources = null;
         }
 
         // Cache for performance
@@ -1130,6 +1142,9 @@ export class DataIntegrationService {
                         .filter(word => word.length > 0); // Remove empty strings
                 });
                 
+                // Debug: Log the case keywords being checked
+                console.log(`🔍 Checking case "${caseInfo.name}" with keywords: [${caseKeywords.join(', ')}]`);
+                
                 // Check for exact word matches (not substring matches)
                 const matchingKeywords = caseKeywords.filter(keyword => 
                     queryWords.includes(keyword)
@@ -1295,6 +1310,51 @@ export class DataIntegrationService {
             .slice(0, 10); // Limit to top 10 keywords
 
         return keywords;
+    }
+
+    /**
+     * Get reputable sources for a query
+     */
+    async getReputableSources(query, limit = 3) {
+        if (!this.reputableSources) {
+            console.log('⚠️ Reputable sources service not available');
+            return [];
+        }
+
+        try {
+            return await this.reputableSources.findRelevantSources(query, limit);
+        } catch (error) {
+            console.error('❌ Error getting reputable sources:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Get reputable sources for a specific disease
+     */
+    async getReputableSourcesForDisease(disease, limit = 5) {
+        if (!this.reputableSources) {
+            console.log('⚠️ Reputable sources service not available');
+            return [];
+        }
+
+        try {
+            return await this.reputableSources.findSourcesForDisease(disease, limit);
+        } catch (error) {
+            console.error('❌ Error getting reputable sources for disease:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Format reputable sources for AI response
+     */
+    formatReputableSourcesForResponse(sources) {
+        if (!this.reputableSources) {
+            return '';
+        }
+
+        return this.reputableSources.formatSourcesForResponse(sources);
     }
 
     /**
