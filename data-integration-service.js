@@ -1203,10 +1203,75 @@ export class DataIntegrationService {
      */
     getFallbackLIACases() {
         return {
-            activeCases: [],
-            allCases: [],
-            totalActive: 0,
-            totalCases: 0,
+            activeCases: [
+                {
+                    caseType: 'mesothelioma',
+                    name: 'Mesothelioma',
+                    description: 'Mesothelioma and asbestos exposure cases',
+                    keywords: ['mesothelioma', 'asbestos', 'asbestos exposure', 'lung cancer', 'pleural mesothelioma'],
+                    active: true,
+                    lastUpdated: new Date().toISOString(),
+                    source: 'fallback'
+                },
+                {
+                    caseType: 'talcum-powder',
+                    name: 'Talcum Powder',
+                    description: 'Talcum powder and ovarian cancer cases',
+                    keywords: ['talcum powder', 'talc', 'baby powder', 'ovarian cancer', 'johnson & johnson'],
+                    active: true,
+                    lastUpdated: new Date().toISOString(),
+                    source: 'fallback'
+                },
+                {
+                    caseType: 'roundup',
+                    name: 'Roundup',
+                    description: 'Roundup weedkiller and cancer cases',
+                    keywords: ['roundup', 'glyphosate', 'weedkiller', 'non-hodgkin lymphoma', 'bayer', 'monsanto'],
+                    active: true,
+                    lastUpdated: new Date().toISOString(),
+                    source: 'fallback'
+                }
+            ],
+            allCases: [
+                {
+                    caseType: 'mesothelioma',
+                    name: 'Mesothelioma',
+                    description: 'Mesothelioma and asbestos exposure cases',
+                    keywords: ['mesothelioma', 'asbestos', 'asbestos exposure', 'lung cancer', 'pleural mesothelioma'],
+                    active: true,
+                    lastUpdated: new Date().toISOString(),
+                    source: 'fallback'
+                },
+                {
+                    caseType: 'talcum-powder',
+                    name: 'Talcum Powder',
+                    description: 'Talcum powder and ovarian cancer cases',
+                    keywords: ['talcum powder', 'talc', 'baby powder', 'ovarian cancer', 'johnson & johnson'],
+                    active: true,
+                    lastUpdated: new Date().toISOString(),
+                    source: 'fallback'
+                },
+                {
+                    caseType: 'roundup',
+                    name: 'Roundup',
+                    description: 'Roundup weedkiller and cancer cases',
+                    keywords: ['roundup', 'glyphosate', 'weedkiller', 'non-hodgkin lymphoma', 'bayer', 'monsanto'],
+                    active: true,
+                    lastUpdated: new Date().toISOString(),
+                    source: 'fallback'
+                },
+                {
+                    caseType: 'car-accident',
+                    name: 'Car Accident',
+                    description: 'Car accident and personal injury cases',
+                    keywords: ['car accident', 'auto accident', 'traffic accident', 'personal injury'],
+                    active: false,
+                    lastUpdated: new Date().toISOString(),
+                    source: 'fallback'
+                }
+            ],
+            totalActive: 3,
+            totalCases: 4,
             lastUpdated: new Date().toISOString(),
             source: 'fallback'
         };

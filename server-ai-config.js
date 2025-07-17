@@ -90,10 +90,10 @@ CRITICAL INSTRUCTIONS:
 2. Be empathetic and informative about their situation
 3. Only use verified information from your database
 4. Keep response concise and professional
-5. DO NOT mention any specific law firms or referral services
-6. Focus on medical and legal information, not referrals
+5. Focus on medical and legal information
+6. DO NOT include referral messages - the system will add them automatically
 
-IMPORTANT: DO NOT include any referral messages - the system will handle referrals automatically when appropriate.`
+IMPORTANT: The system will automatically add a Legal Injury Advocates referral link for this active case. Focus on providing helpful information about the case, symptoms, legal rights, and available compensation.`
     },
 
     // Error Messages

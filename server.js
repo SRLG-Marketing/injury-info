@@ -241,66 +241,75 @@ app.post('/api/chat', async (req, res) => {
     
     console.log('🔍 RESPONSE AFTER SOURCES ADDED:', responseWithSources);
     
-    // Remove ALL custom referral messages - only allow the exact generic referral message from AI_CONFIG
-    // Remove any referral message that contains "currently handling" followed by specific case details
-    responseWithSources = responseWithSources.replace(
-      /➡️\s*Legal Injury Advocates is currently handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
-    responseWithSources = responseWithSources.replace(
-      /Legal Injury Advocates is currently handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
+    // Add Legal Injury Advocates referral for active cases
+    if (liaCaseInfo && liaCaseInfo.isActive) {
+      const referralMessage = `\n\n➡️ **Legal Injury Advocates is currently accepting new cases.** You can start your claim at [legalinjuryadvocates.com](https://legalinjuryadvocates.com).`;
+      responseWithSources += referralMessage;
+      console.log('🔗 Added generic LIA referral for active case');
+    }
     
-    // Also remove any referral messages that mention specific case types or lawsuits
-    responseWithSources = responseWithSources.replace(
-      /➡️\s*Legal Injury Advocates[^.]*lawsuits?[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
-    responseWithSources = responseWithSources.replace(
-      /Legal Injury Advocates[^.]*lawsuits?[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
-    
-    // Remove any referral messages that mention specific case types (hair straightener, chemical, etc.)
-    responseWithSources = responseWithSources.replace(
-      /➡️\s*Legal Injury Advocates[^.]*(?:hair|chemical|straightener|relaxer)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
-    responseWithSources = responseWithSources.replace(
-      /Legal Injury Advocates[^.]*(?:hair|chemical|straightener|relaxer)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
-    
-    // Remove any referral messages that mention specific case types or conditions
-    responseWithSources = responseWithSources.replace(
-      /➡️\s*Legal Injury Advocates[^.]*(?:mesothelioma|asbestos|talcum|powder|roundup|glyphosate|pfas|paraquat)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
-    responseWithSources = responseWithSources.replace(
-      /Legal Injury Advocates[^.]*(?:mesothelioma|asbestos|talcum|powder|roundup|glyphosate|pfas|paraquat)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
-    
-    // Remove any referral messages that mention "affected by" or "been affected by"
-    responseWithSources = responseWithSources.replace(
-      /➡️\s*If you or a loved one has been affected by[^.]*\.\s*Legal Injury Advocates[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
-    responseWithSources = responseWithSources.replace(
-      /If you or a loved one has been affected by[^.]*\.\s*Legal Injury Advocates[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
-    
-    // Remove any referral messages that mention "actively handling" or "currently handling"
-    responseWithSources = responseWithSources.replace(
-      /➡️\s*Legal Injury Advocates is (?:actively|currently) handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
-    responseWithSources = responseWithSources.replace(
-      /Legal Injury Advocates is (?:actively|currently) handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
+    // Remove referral messages only for non-active cases
+    if (!liaCaseInfo || !liaCaseInfo.isActive) {
+      // Remove any referral message that contains "currently handling" followed by specific case details
+      responseWithSources = responseWithSources.replace(
+        /➡️\s*Legal Injury Advocates is currently handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      responseWithSources = responseWithSources.replace(
+        /Legal Injury Advocates is currently handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      
+      // Also remove any referral messages that mention specific case types or lawsuits
+      responseWithSources = responseWithSources.replace(
+        /➡️\s*Legal Injury Advocates[^.]*lawsuits?[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      responseWithSources = responseWithSources.replace(
+        /Legal Injury Advocates[^.]*lawsuits?[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      
+      // Remove any referral messages that mention specific case types (hair straightener, chemical, etc.)
+      responseWithSources = responseWithSources.replace(
+        /➡️\s*Legal Injury Advocates[^.]*(?:hair|chemical|straightener|relaxer)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      responseWithSources = responseWithSources.replace(
+        /Legal Injury Advocates[^.]*(?:hair|chemical|straightener|relaxer)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      
+      // Remove any referral messages that mention specific case types or conditions
+      responseWithSources = responseWithSources.replace(
+        /➡️\s*Legal Injury Advocates[^.]*(?:mesothelioma|asbestos|talcum|powder|roundup|glyphosate|pfas|paraquat)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      responseWithSources = responseWithSources.replace(
+        /Legal Injury Advocates[^.]*(?:mesothelioma|asbestos|talcum|powder|roundup|glyphosate|pfas|paraquat)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      
+      // Remove any referral messages that mention "affected by" or "been affected by"
+      responseWithSources = responseWithSources.replace(
+        /➡️\s*If you or a loved one has been affected by[^.]*\.\s*Legal Injury Advocates[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      responseWithSources = responseWithSources.replace(
+        /If you or a loved one has been affected by[^.]*\.\s*Legal Injury Advocates[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      
+      // Remove any referral messages that mention "actively handling" or "currently handling"
+      responseWithSources = responseWithSources.replace(
+        /➡️\s*Legal Injury Advocates is (?:actively|currently) handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      responseWithSources = responseWithSources.replace(
+        /Legal Injury Advocates is (?:actively|currently) handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+    }
     
     console.log('🔍 RESPONSE AFTER REGEX CLEANUP:', responseWithSources);
     
@@ -535,11 +544,12 @@ app.get('/api/config/status', (req, res) => {
         ]
       },
       lia: {
-        enabled: false,
+        enabled: true,
         features: [
-          'System is referral-free',
-          'No automatic referrals',
-          'Medical and legal information only'
+          'Active case detection from Google Sheets',
+          'Automatic referrals for active cases',
+          'Referral-free for inactive cases',
+          'Medical and legal information provided'
         ]
       },
       urls: {
