@@ -243,7 +243,7 @@ app.post('/api/chat', async (req, res) => {
     
     // Add Legal Injury Advocates referral for active cases
     if (liaCaseInfo && liaCaseInfo.isActive) {
-      const referralMessage = `\n\n➡️ **Legal Injury Advocates is currently accepting new cases.** You can start your claim at [legalinjuryadvocates.com](https://legalinjuryadvocates.com).`;
+      const referralMessage = `\n\n➡️ **Legal Injury Advocates is currently accepting new cases. You can start your claim at** [legalinjuryadvocates.com](https://legalinjuryadvocates.com).`;
       responseWithSources += referralMessage;
       console.log('🔗 Added generic LIA referral for active case');
     }
