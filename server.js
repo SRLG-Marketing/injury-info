@@ -33,7 +33,34 @@ const verificationMiddleware = new DataVerificationMiddleware();
 
 // Middleware
 app.use(cors({
-  origin: getCorsOrigins(),
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = getCorsOrigins();
+    
+    // Check if origin is explicitly allowed
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Check wildcard patterns
+    for (const pattern of allowedOrigins) {
+      if (pattern.includes('*')) {
+        const regexPattern = pattern.replace(/\*/g, '.*');
+        if (new RegExp(regexPattern).test(origin)) return callback(null, true);
+      }
+    }
+    
+    // Special handling for HubSpot sandbox domains
+    if (origin.includes('hs-sites.com') || origin.includes('hubspot.com')) {
+      console.log(`🔧 Allowing HubSpot domain: ${origin}`);
+      return callback(null, true);
+    }
+    
+    console.log(`❌ CORS blocked origin: ${origin}`);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: [

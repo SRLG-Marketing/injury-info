@@ -51,8 +51,10 @@ export function getCorsOrigins() {
     'https://*.github.io'
   ];
   
-  // HubSpot domains
+  // HubSpot domains - be more specific to avoid wildcard issues
   const hubspotOrigins = [
+    'https://injuryinfo-com.sandbox.hs-sites.com',
+    'https://injuryinfo-com.hs-sites.com',
     'https://*.hubspot.com',
     'https://*.hubapi.com',
     'https://*.hs-sites.com',
