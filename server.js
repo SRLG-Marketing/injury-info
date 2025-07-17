@@ -133,7 +133,6 @@ app.post('/api/chat', async (req, res) => {
 
     console.log('Received chat request:', { 
       message, 
-      systemMessage: systemMessage?.substring(0, 100) + '...',
       baseUrl,
       apiBaseUrl
     });
@@ -194,7 +193,7 @@ app.post('/api/chat', async (req, res) => {
       content: selectedSystemMessage
     });
     
-    console.log('🔍 SYSTEM MESSAGE BEING SENT TO AI:', selectedSystemMessage);
+
 
     // Add context data if available
     if (contextData.length > 0) {
@@ -225,7 +224,7 @@ app.post('/api/chat', async (req, res) => {
 
     const aiResponse = completion.choices[0].message.content;
     console.log('OpenAI response received:', aiResponse.substring(0, 100) + '...');
-    console.log('🔍 FULL AI RESPONSE:', aiResponse);
+
 
     // Verify response against data sources
     const verification = await verificationMiddleware.verifyResponse(aiResponse, message);
@@ -239,13 +238,13 @@ app.post('/api/chat', async (req, res) => {
     
     // No automatic referral messages - system is referral-free
     
-    console.log('🔍 RESPONSE AFTER SOURCES ADDED:', responseWithSources);
+
     
     // Add Legal Injury Advocates referral for active cases
     if (liaCaseInfo && liaCaseInfo.isActive) {
       const referralMessage = `\n\n➡️ **Legal Injury Advocates is currently accepting new cases. You can start your claim at** [legalinjuryadvocates.com](https://legalinjuryadvocates.com).`;
       responseWithSources += referralMessage;
-      console.log('🔗 Added generic LIA referral for active case');
+
     }
     
     // Remove referral messages only for non-active cases
@@ -311,7 +310,7 @@ app.post('/api/chat', async (req, res) => {
       );
     }
     
-    console.log('🔍 RESPONSE AFTER REGEX CLEANUP:', responseWithSources);
+
     
     res.json({ 
       response: responseWithSources,
