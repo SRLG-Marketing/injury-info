@@ -179,11 +179,11 @@ app.post('/api/chat', async (req, res) => {
     // Prepare messages for OpenAI
     const messages = [];
     
-    // Use appropriate system message based on whether this is an LIA active case
+    // Use appropriate system message based on whether this is an active case
     let selectedSystemMessage;
     if (liaCaseInfo && liaCaseInfo.isActive) {
-      // Use LIA active case system message for active cases
-      selectedSystemMessage = SERVER_AI_CONFIG.systemMessages.liaActiveCase(liaCaseInfo);
+      // Use active case system message for active cases
+      selectedSystemMessage = SERVER_AI_CONFIG.systemMessages.activeCase(liaCaseInfo);
     } else {
       // Use general system message for other cases
       selectedSystemMessage = SERVER_AI_CONFIG.systemMessages.general;
@@ -237,18 +237,7 @@ app.post('/api/chat', async (req, res) => {
       responseWithSources += sourcesText;
     }
     
-    // Add legal referral message if LIA case is detected and no referral already exists
-    if (liaCaseInfo && liaCaseInfo.isActive) {
-      // Check if the response already contains a referral message
-      const lowerResponse = responseWithSources.toLowerCase();
-      const hasReferral = lowerResponse.includes('legal injury advocates') || 
-                         lowerResponse.includes('legalinjuryadvocates.com') ||
-                         lowerResponse.includes('start your claim');
-      
-      if (!hasReferral) {
-        responseWithSources += '\n\n' + AI_CONFIG.formatting.legalReferralMessage;
-      }
-    }
+    // No automatic referral messages - system is referral-free
     
     console.log('🔍 RESPONSE AFTER SOURCES ADDED:', responseWithSources);
     
@@ -546,11 +535,11 @@ app.get('/api/config/status', (req, res) => {
         ]
       },
       lia: {
-        enabled: true,
+        enabled: false,
         features: [
-          'Automatic LIA case detection',
-          'Active case prompting',
-          'legalinjuryadvocates.com referrals'
+          'System is referral-free',
+          'No automatic referrals',
+          'Medical and legal information only'
         ]
       },
       urls: {

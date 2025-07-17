@@ -615,7 +615,7 @@ export class DataIntegrationService {
                 name: 'Saddle Rock Legal Group',
                 location: 'Nationwide',
                 phone: '(800) 123-4567',
-                website: 'https://legalinjuryadvocates.com',
+                website: 'https://saddlerocklegal.com',
                 specialties: ['Mesothelioma', 'Asbestos', 'Product Liability'],
                 experience: '20+ years',
                 successRate: '95%',

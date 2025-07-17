@@ -13,7 +13,7 @@ export const CONNECTED_DATA_SOURCES = [
 // Dynamic LIA Active Cases (loaded from Google Sheets via server API)
 let DYNAMIC_LIA_CASES = null;
 
-// Fetch LIA active cases from server
+// Fetch active cases from server
 async function fetchLIAActiveCases() {
     try {
         const response = await fetch(`${AI_CONFIG.api.baseURL}/api/lia/active-cases`);
@@ -24,17 +24,17 @@ async function fetchLIAActiveCases() {
         const data = await response.json();
         DYNAMIC_LIA_CASES = data;
         
-        console.log(`📊 Loaded ${data.totalActive} active LIA cases from ${data.source}`);
+        console.log(`📊 Loaded ${data.totalActive} active cases from ${data.source}`);
         return data;
     } catch (error) {
-        console.error('❌ Failed to fetch LIA active cases:', error);
-        DYNAMIC_LIA_CASES = getFallbackLIACases();
+        console.error('❌ Failed to fetch active cases:', error);
+        DYNAMIC_LIA_CASES = getFallbackCases();
         return DYNAMIC_LIA_CASES;
     }
 }
 
-// Get fallback LIA cases if server is unavailable
-function getFallbackLIACases() {
+// Get fallback cases if server is unavailable
+function getFallbackCases() {
     return {
         activeCases: [
             {
@@ -64,9 +64,9 @@ function getFallbackLIACases() {
 
 // Note: Removed restrictive topic checking - AI now provides guidance for all topics
 
-// Check if question relates to LIA active cases (now dynamic)
+// Check if question relates to active cases (now dynamic)
 export async function isLIAActiveCase(question) {
-    // Ensure we have the latest LIA cases data
+    // Ensure we have the latest cases data
     if (!DYNAMIC_LIA_CASES) {
         await fetchLIAActiveCases();
     }
@@ -89,7 +89,7 @@ export async function isLIAActiveCase(question) {
     return { isActive: false };
 }
 
-// Get active LIA cases (updated to use dynamic data)
+// Get active cases (updated to use dynamic data)
 export async function getActiveLIACases() {
     if (!DYNAMIC_LIA_CASES) {
         await fetchLIAActiveCases();
@@ -98,7 +98,7 @@ export async function getActiveLIACases() {
     return DYNAMIC_LIA_CASES.activeCases || [];
 }
 
-// Get all LIA cases (updated to use dynamic data)
+// Get all cases (updated to use dynamic data)
 export async function getAllLIACases() {
     if (!DYNAMIC_LIA_CASES) {
         await fetchLIAActiveCases();
@@ -107,9 +107,9 @@ export async function getAllLIACases() {
     return DYNAMIC_LIA_CASES;
 }
 
-// Refresh LIA cases from server
+// Refresh cases from server
 export async function refreshLIAActiveCases() {
-    console.log('🔄 Refreshing LIA active cases...');
+    console.log('🔄 Refreshing active cases...');
     return await fetchLIAActiveCases();
 }
 
@@ -212,16 +212,9 @@ IMPORTANT: DO NOT include any specific referral messages - the system will add t
 
     // Response Formatting
     formatting: {
-        // Keywords that trigger legal referral
-        legalReferralKeywords: [
-            'consult', 'speak to', 'talk to', 'meet with', 'attorney', 'lawyer', 
-            'file a claim', 'legal advice', 'legal options', 'seek legal', 
-            'recommend', 'contact a lawyer', 'contact an attorney', 'how to file',
-            'where to file', 'get compensation', 'payout', 'settlement'
-        ],
+        // No referral keywords - system is referral-free
 
-        // Legal referral message
-        legalReferralMessage: `<br><br><strong>Legal Injury Advocates is currently taking cases for this type of injury. You can learn more at <a href="https://legalinjuryadvocates.com" target="_blank">legalinjuryadvocates.com</a>.</strong>`
+        // No referral messages - system is referral-free
     },
 
     // Error Messages
@@ -255,25 +248,15 @@ export function createApiRequest(message, systemMessage = null, options = {}) {
     };
 }
 
-// Helper function to check if response should include legal referral
+// Helper function to check if response should include legal referral (DISABLED)
 export async function shouldIncludeLegalReferral(text) {
-    // Check if the text relates to LIA active cases
-    const liaCheck = await isLIAActiveCase(text);
-    if (!liaCheck.isActive) {
-        return false;
-    }
-    
-    // Check if text contains legal-related keywords
-    const lowerText = text.toLowerCase();
-    return AI_CONFIG.formatting.legalReferralKeywords.some(keyword => 
-        lowerText.includes(keyword.toLowerCase())
-    );
+    // System is referral-free - no referrals are added
+    return false;
 }
 
-// Helper function to add legal referral to response
+// Helper function to add legal referral to response (DISABLED)
 export async function addLegalReferralIfNeeded(text) {
-    // The server now handles all LIA case detection and messaging
-    // This function is kept for backward compatibility but no longer adds messages
+    // System is referral-free - no referrals are added
     return text;
 }
 
@@ -460,10 +443,10 @@ if (typeof window !== 'undefined') {
         }
     })();
 
-    // Load LIA cases when the module loads
+    // Load active cases when the module loads
     fetchLIAActiveCases().then(() => {
-        console.log('✅ LIA active cases loaded from Google Sheets');
+        console.log('✅ Active cases loaded from Google Sheets');
     }).catch(error => {
-        console.warn('⚠️ Failed to load LIA active cases:', error);
+        console.warn('⚠️ Failed to load active cases:', error);
     });
 } 
