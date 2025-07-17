@@ -55,11 +55,9 @@ app.use(cors({
     
     // Special handling for HubSpot sandbox domains
     if (origin.includes('hs-sites.com') || origin.includes('hubspot.com')) {
-      console.log(`🔧 Allowing HubSpot domain: ${origin}`);
       return callback(null, true);
     }
     
-    console.log(`❌ CORS blocked origin: ${origin}`);
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -115,7 +113,6 @@ app.options('*', cors({
 // Serve static files from public directory (development only)
 if (process.env.NODE_ENV !== 'production') {
   app.use(express.static(path.join(__dirname, 'public')));
-  console.log('🔧 Development mode: Serving static files from public directory');
 }
 
 // API endpoint for OpenAI chat
@@ -178,15 +175,8 @@ app.post('/api/chat', async (req, res) => {
     // Prepare messages for OpenAI
     const messages = [];
     
-    // Use appropriate system message based on whether this is an active case
-    let selectedSystemMessage;
-    if (liaCaseInfo && liaCaseInfo.isActive) {
-      // Use active case system message for active cases
-      selectedSystemMessage = SERVER_AI_CONFIG.systemMessages.activeCase(liaCaseInfo);
-    } else {
-      // Use general system message for other cases
-      selectedSystemMessage = SERVER_AI_CONFIG.systemMessages.general;
-    }
+    // Use the general system message for all cases to prevent specific referral generation
+    const selectedSystemMessage = SERVER_AI_CONFIG.systemMessages.general;
     
     messages.push({
       role: 'system',
@@ -242,10 +232,92 @@ app.post('/api/chat', async (req, res) => {
     
     // Add Legal Injury Advocates referral for active cases
     if (liaCaseInfo && liaCaseInfo.isActive) {
+      // First, remove any specific referral messages that the AI might have generated
+      // Remove messages with "currently handling" followed by any text
+      responseWithSources = responseWithSources.replace(
+        /➡️\s*Legal Injury Advocates is currently handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      responseWithSources = responseWithSources.replace(
+        /Legal Injury Advocates is currently handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      
+      // Remove any referral messages that mention specific case types
+      responseWithSources = responseWithSources.replace(
+        /➡️\s*Legal Injury Advocates[^.]*(?:forever chemicals|pfas|water contamination)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      responseWithSources = responseWithSources.replace(
+        /Legal Injury Advocates[^.]*(?:forever chemicals|pfas|water contamination)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      
+      // Remove any referral messages that mention "in water" or "water contamination"
+      responseWithSources = responseWithSources.replace(
+        /➡️\s*Legal Injury Advocates[^.]*in water[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      responseWithSources = responseWithSources.replace(
+        /Legal Injury Advocates[^.]*in water[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      
+      // Remove any referral messages that mention "water contamination"
+      responseWithSources = responseWithSources.replace(
+        /➡️\s*Legal Injury Advocates[^.]*water contamination[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      responseWithSources = responseWithSources.replace(
+        /Legal Injury Advocates[^.]*water contamination[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      
+      // Remove any referral messages that mention "forever chemicals"
+      responseWithSources = responseWithSources.replace(
+        /➡️\s*Legal Injury Advocates[^.]*forever chemicals[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      responseWithSources = responseWithSources.replace(
+        /Legal Injury Advocates[^.]*forever chemicals[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      
+      // Now add the generic referral message
       const referralMessage = `\n\n➡️ **Legal Injury Advocates is currently accepting new cases. You can start your claim at** [legalinjuryadvocates.com](https://legalinjuryadvocates.com).`;
       responseWithSources += referralMessage;
-
     }
+    
+    // Comprehensive cleanup of any old referral messages for ALL responses
+    // Remove any referral messages that mention specific case details
+    responseWithSources = responseWithSources.replace(
+      /➡️\s*Legal Injury Advocates is currently handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    responseWithSources = responseWithSources.replace(
+      /Legal Injury Advocates is currently handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    
+    // Remove the specific "forever chemicals in water" referral message that the AI is generating
+    responseWithSources = responseWithSources.replace(
+      /➡️\s*Legal Injury Advocates is currently handling forever chemicals in water\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    responseWithSources = responseWithSources.replace(
+      /Legal Injury Advocates is currently handling forever chemicals in water\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    
+    // Remove any referral messages that mention "forever chemicals in water"
+    responseWithSources = responseWithSources.replace(
+      /➡️\s*Legal Injury Advocates[^.]*forever chemicals in water[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    responseWithSources = responseWithSources.replace(
+      /Legal Injury Advocates[^.]*forever chemicals in water[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
     
     // Remove referral messages only for non-active cases
     if (!liaCaseInfo || !liaCaseInfo.isActive) {
@@ -308,6 +380,26 @@ app.post('/api/chat', async (req, res) => {
         /Legal Injury Advocates is (?:actively|currently) handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
         ''
       );
+      
+      // Remove any referral messages that mention "forever chemicals" (catch all variations)
+      responseWithSources = responseWithSources.replace(
+        /➡️\s*Legal Injury Advocates[^.]*forever chemicals[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      responseWithSources = responseWithSources.replace(
+        /Legal Injury Advocates[^.]*forever chemicals[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      
+      // Remove any referral messages that mention "water" (catch all water-related cases)
+      responseWithSources = responseWithSources.replace(
+        /➡️\s*Legal Injury Advocates[^.]*water[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
+      responseWithSources = responseWithSources.replace(
+        /Legal Injury Advocates[^.]*water[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+        ''
+      );
     }
     
 
@@ -347,9 +439,7 @@ app.post('/api/chat', async (req, res) => {
 // API endpoint to get article data
 app.get('/api/articles', async (req, res) => {
   try {
-    console.log('📊 Fetching articles from data sources...');
     const articles = await dataService.getAllArticles();
-    console.log(`✅ Returning ${articles.length} articles`);
     res.json(articles);
   } catch (error) {
     console.error('❌ Error fetching articles:', error);
@@ -362,7 +452,6 @@ app.get('/api/articles/:slug', async (req, res) => {
   const { slug } = req.params;
   
   try {
-    console.log(`📄 Fetching article with slug: ${slug}`);
     const articles = await dataService.getAllArticles();
     let article = articles.find(a => a.slug === slug);
     
@@ -376,7 +465,6 @@ app.get('/api/articles/:slug', async (req, res) => {
       return res.status(404).json({ error: 'Article not found' });
     }
     
-    console.log(`✅ Found article: ${article.title}`);
     res.json(article);
   } catch (error) {
     console.error('❌ Error fetching article:', error);
@@ -388,10 +476,8 @@ app.get('/api/articles/:slug', async (req, res) => {
 app.get('/api/law-firms', async (req, res) => {
   try {
     const { specialty, location } = req.query;
-    console.log(`🏛️ Fetching law firms - specialty: ${specialty}, location: ${location}`);
     
     const lawFirms = await dataService.getLawFirms(specialty, location);
-    console.log(`✅ Returning ${lawFirms.length} law firms`);
     
     res.json(lawFirms);
   } catch (error) {
@@ -404,10 +490,8 @@ app.get('/api/law-firms', async (req, res) => {
 app.get('/api/settlements', async (req, res) => {
   try {
     const { condition, state } = req.query;
-    console.log(`💰 Fetching settlement data - condition: ${condition}, state: ${state}`);
     
     const settlements = await dataService.getSettlementData(condition, state);
-    console.log(`✅ Returning settlement data for ${condition}`);
     
     res.json(settlements);
   } catch (error) {
@@ -420,10 +504,8 @@ app.get('/api/settlements', async (req, res) => {
 app.get('/api/search/:condition', async (req, res) => {
   try {
     const { condition } = req.params;
-    console.log(`🔍 Searching for comprehensive information about: ${condition}`);
     
     const result = await dataService.searchCondition(condition);
-    console.log(`✅ Found information for ${condition}`);
     
     res.json(result);
   } catch (error) {
@@ -444,14 +526,10 @@ app.get('/api/reputable-sources', async (req, res) => {
     let sources = [];
     
     if (query) {
-      console.log(`📚 Fetching reputable sources for query: "${query}"`);
       sources = await dataService.getReputableSources(query, parseInt(limit));
     } else if (disease) {
-      console.log(`📚 Fetching reputable sources for disease: "${disease}"`);
       sources = await dataService.getReputableSourcesForDisease(disease, parseInt(limit));
     }
-    
-    console.log(`✅ Found ${sources.length} reputable sources`);
     
     res.json({
       sources: sources.map(source => ({
@@ -477,7 +555,6 @@ app.get('/api/reputable-sources', async (req, res) => {
 app.post('/api/cache/clear', async (req, res) => {
   try {
     dataService.clearCache();
-    console.log('🗑️ Cache cleared');
     res.json({ message: 'Cache cleared successfully' });
   } catch (error) {
     console.error('❌ Error clearing cache:', error);
@@ -515,8 +592,6 @@ app.get('/api/config/status', (req, res) => {
     const status = getConfigurationStatus();
     const baseUrl = getBaseUrl(req);
     const apiBaseUrl = getApiBaseUrl(req);
-    
-    console.log('📊 Configuration status requested');
     
     // Don't expose sensitive information like API keys
     const safeStatus = {
@@ -568,7 +643,6 @@ app.get('/api/config/status', (req, res) => {
 // API endpoint to get LIA active cases
 app.get('/api/lia/active-cases', async (req, res) => {
   try {
-    console.log('📊 Fetching LIA active cases from Google Sheets...');
     const liaData = await dataService.getLIAActiveCases();
     
     res.json({
@@ -590,7 +664,6 @@ app.post('/api/lia/check-case', async (req, res) => {
       return res.status(400).json({ error: 'Query is required' });
     }
     
-    console.log(`🔍 Checking LIA active case for query: "${query}"`);
     const result = await dataService.checkLIAActiveCase(query);
     
     res.json({
@@ -608,11 +681,9 @@ app.post('/api/lia/check-case', async (req, res) => {
 app.get('/api/analytics/queries', async (req, res) => {
   try {
     const { days = 30 } = req.query;
-    console.log(`📊 Fetching query analytics for last ${days} days`);
     
     const analytics = await dataService.getQueryAnalytics(parseInt(days));
     
-    console.log(`✅ Returning analytics: ${analytics.totalQueries} queries, ${analytics.topKeywords.length} top keywords`);
     res.json(analytics);
   } catch (error) {
     console.error('❌ Error fetching query analytics:', error);
@@ -624,7 +695,6 @@ app.get('/api/analytics/queries', async (req, res) => {
 app.get('/api/analytics/export', async (req, res) => {
   try {
     const { days = 30 } = req.query;
-    console.log(`📥 Exporting query analytics for last ${days} days`);
     
     // Import the QueryLogger dynamically
     const { QueryLogger } = await import('./utils/query-logger.js');
@@ -638,7 +708,6 @@ app.get('/api/analytics/export', async (req, res) => {
     
     // Send the CSV file
     res.download(result.file, `query-analytics-${new Date().toISOString().split('T')[0]}.csv`);
-    console.log(`✅ Exported CSV: ${result.file}`);
     
   } catch (error) {
     console.error('❌ Error exporting analytics:', error);
@@ -655,7 +724,6 @@ app.post('/api/verify-article', async (req, res) => {
       return res.status(400).json({ error: 'Article title is required' });
     }
     
-    console.log(`🔍 Verifying article: "${articleTitle}"`);
     const verification = await verificationMiddleware.verifyArticleExists(articleTitle);
     
     res.json({

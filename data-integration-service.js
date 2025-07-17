@@ -1170,11 +1170,8 @@ export class DataIntegrationService {
                     queryWords.includes(keyword)
                 );
                 
-                // Require at least 2 keyword matches OR a specific high-value keyword match
-                const highValueKeywords = ['mesothelioma', 'asbestos', 'talcum', 'powder', 'hair', 'relaxer', 'straightener', 'roundup', 'glyphosate', 'pfas', 'paraquat'];
-                const hasHighValueMatch = matchingKeywords.some(keyword => highValueKeywords.includes(keyword));
-                
-                if (matchingKeywords.length >= 2 || hasHighValueMatch) {
+                // Require at least 2 keyword matches to avoid false positives
+                if (matchingKeywords.length >= 2) {
                     console.log(`✅ Query matches case "${caseInfo.name}" with keywords: ${matchingKeywords.join(', ')}`);
                     console.log(`📝 Case description: ${caseInfo.description}`);
                     
@@ -1205,28 +1202,10 @@ export class DataIntegrationService {
         return {
             activeCases: [
                 {
-                    caseType: 'mesothelioma',
-                    name: 'Mesothelioma',
-                    description: 'Mesothelioma and asbestos exposure cases',
-                    keywords: ['mesothelioma', 'asbestos', 'asbestos exposure', 'lung cancer', 'pleural mesothelioma'],
-                    active: true,
-                    lastUpdated: new Date().toISOString(),
-                    source: 'fallback'
-                },
-                {
                     caseType: 'talcum-powder',
                     name: 'Talcum Powder',
                     description: 'Talcum powder and ovarian cancer cases',
                     keywords: ['talcum powder', 'talc', 'baby powder', 'ovarian cancer', 'johnson & johnson'],
-                    active: true,
-                    lastUpdated: new Date().toISOString(),
-                    source: 'fallback'
-                },
-                {
-                    caseType: 'roundup',
-                    name: 'Roundup',
-                    description: 'Roundup weedkiller and cancer cases',
-                    keywords: ['roundup', 'glyphosate', 'weedkiller', 'non-hodgkin lymphoma', 'bayer', 'monsanto'],
                     active: true,
                     lastUpdated: new Date().toISOString(),
                     source: 'fallback'
@@ -1238,7 +1217,7 @@ export class DataIntegrationService {
                     name: 'Mesothelioma',
                     description: 'Mesothelioma and asbestos exposure cases',
                     keywords: ['mesothelioma', 'asbestos', 'asbestos exposure', 'lung cancer', 'pleural mesothelioma'],
-                    active: true,
+                    active: false,
                     lastUpdated: new Date().toISOString(),
                     source: 'fallback'
                 },
@@ -1256,7 +1235,7 @@ export class DataIntegrationService {
                     name: 'Roundup',
                     description: 'Roundup weedkiller and cancer cases',
                     keywords: ['roundup', 'glyphosate', 'weedkiller', 'non-hodgkin lymphoma', 'bayer', 'monsanto'],
-                    active: true,
+                    active: false,
                     lastUpdated: new Date().toISOString(),
                     source: 'fallback'
                 },
@@ -1270,7 +1249,7 @@ export class DataIntegrationService {
                     source: 'fallback'
                 }
             ],
-            totalActive: 3,
+            totalActive: 1,
             totalCases: 4,
             lastUpdated: new Date().toISOString(),
             source: 'fallback'
