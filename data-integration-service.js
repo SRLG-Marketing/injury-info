@@ -918,13 +918,11 @@ export class DataIntegrationService {
             'roundup': ['glyphosate', 'weed killer', 'herbicide', 'monsanto', 'bayer'],
             'hair relaxer': ['hair straightener', 'chemical straightener', 'relaxer', 'uterine cancer'],
             'mesothelioma': ['asbestos', 'asbestos exposure', 'pleural mesothelioma', 'peritoneal mesothelioma'],
-            'pfas': ['forever chemicals', 'water contamination', 'pfas chemicals', 'perfluoroalkyl', 'pfoa', 'pfos'],
             'depo-provera': ['birth control', 'contraceptive', 'medroxyprogesterone'],
             'necrotizing enterocolitis': ['nec', 'premature baby', 'intestinal disease'],
             'paraquat': ['herbicide', 'weed killer', 'parkinson\'s disease', 'parkinsons'],
             'talcum powder': ['talc', 'baby powder', 'ovarian cancer', 'johnson & johnson', 'johnson and johnson'],
-            'camp lejeune': ['camp lejeune', 'water contamination', 'military base', 'marine corps'],
-            'afff': ['firefighting foam', 'pfas', 'firefighter', 'military foam']
+            'camp lejeune': ['camp lejeune', 'water contamination', 'military base', 'marine corps']
         };
         
         const lowerCaseName = caseName.toLowerCase();
@@ -1134,7 +1132,29 @@ export class DataIntegrationService {
             console.log(`📋 Available active cases:`, liaData.activeCases.map(c => `${c.name} (${c.caseType})`));
             
             for (const caseInfo of liaData.activeCases) {
-                // Split case keywords into individual words/phrases
+                // First, try exact phrase matching with original keywords
+                const exactPhraseMatches = caseInfo.keywords.filter(keyword => {
+                    const normalizedKeyword = keyword.toLowerCase().trim();
+                    const normalizedQuery = query.toLowerCase().trim();
+                    return normalizedQuery.includes(normalizedKeyword);
+                });
+                
+                if (exactPhraseMatches.length > 0) {
+                    console.log(`✅ Query matches case "${caseInfo.name}" with exact phrases: ${exactPhraseMatches.join(', ')}`);
+                    console.log(`📝 Case description: ${caseInfo.description}`);
+                    
+                    return {
+                        isActive: true,
+                        caseType: caseInfo.caseType,
+                        name: caseInfo.name,
+                        description: caseInfo.description,
+                        keywords: caseInfo.keywords,
+                        lastUpdated: caseInfo.lastUpdated,
+                        matchedKeywords: exactPhraseMatches
+                    };
+                }
+                
+                // If no exact phrase matches, try multi-word matching (require at least 2 keyword matches)
                 const caseKeywords = caseInfo.keywords.flatMap(keyword => {
                     return keyword.toLowerCase()
                         .replace(/[^\w\s]/g, ' ') // Replace punctuation with spaces
@@ -1145,13 +1165,17 @@ export class DataIntegrationService {
                 // Debug: Log the case keywords being checked
                 console.log(`🔍 Checking case "${caseInfo.name}" with keywords: [${caseKeywords.join(', ')}]`);
                 
-                // Check for exact word matches (not substring matches)
+                // Check for word matches, but require multiple matches to avoid false positives
                 const matchingKeywords = caseKeywords.filter(keyword => 
                     queryWords.includes(keyword)
                 );
                 
-                if (matchingKeywords.length > 0) {
-                    console.log(`✅ Query matches case "${caseInfo.name}" with exact keywords: ${matchingKeywords.join(', ')}`);
+                // Require at least 2 keyword matches OR a specific high-value keyword match
+                const highValueKeywords = ['mesothelioma', 'asbestos', 'talcum', 'powder', 'hair', 'relaxer', 'straightener', 'roundup', 'glyphosate', 'pfas', 'paraquat'];
+                const hasHighValueMatch = matchingKeywords.some(keyword => highValueKeywords.includes(keyword));
+                
+                if (matchingKeywords.length >= 2 || hasHighValueMatch) {
+                    console.log(`✅ Query matches case "${caseInfo.name}" with keywords: ${matchingKeywords.join(', ')}`);
                     console.log(`📝 Case description: ${caseInfo.description}`);
                     
                     return {
@@ -1178,41 +1202,11 @@ export class DataIntegrationService {
      * Fallback LIA cases when Google Sheets is unavailable
      */
     getFallbackLIACases() {
-        const fallbackCases = [
-            {
-                caseType: 'mesothelioma',
-                name: 'Mesothelioma',
-                description: 'Mesothelioma and asbestos exposure cases',
-                keywords: ['mesothelioma', 'asbestos', 'asbestos exposure', 'pleural mesothelioma'],
-                active: true,
-                lastUpdated: new Date().toISOString(),
-                source: 'fallback'
-            },
-            {
-                caseType: 'talcum_powder',
-                name: 'Talcum Powder',
-                description: 'Talcum powder ovarian cancer cases',
-                keywords: ['talcum powder', 'talc', 'baby powder', 'ovarian cancer', 'johnson & johnson'],
-                active: true,
-                lastUpdated: new Date().toISOString(),
-                source: 'fallback'
-            },
-            {
-                caseType: 'pfas',
-                name: 'PFAS/Forever Chemicals',
-                description: 'PFAS and forever chemicals in water contamination cases',
-                keywords: ['pfas', 'forever chemicals', 'water contamination', 'pfoa', 'pfos', 'perfluoroalkyl'],
-                active: false, // Set to false by default - only activate if LIA actually handles these
-                lastUpdated: new Date().toISOString(),
-                source: 'fallback'
-            }
-        ];
-
         return {
-            activeCases: fallbackCases.filter(caseInfo => caseInfo.active),
-            allCases: fallbackCases,
-            totalActive: fallbackCases.filter(caseInfo => caseInfo.active).length,
-            totalCases: fallbackCases.length,
+            activeCases: [],
+            allCases: [],
+            totalActive: 0,
+            totalCases: 0,
             lastUpdated: new Date().toISOString(),
             source: 'fallback'
         };

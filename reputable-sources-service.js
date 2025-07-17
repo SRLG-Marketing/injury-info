@@ -314,10 +314,10 @@ export class ReputableSourcesService {
 
         const formattedSources = sources.map(source => {
             const typeLabel = this.getSourceTypeLabel(source.sourceType);
-            return `• **${source.sourceTitle}** (${typeLabel}) - [Read More](${source.sourceUrl})`;
+            return `• <strong>${source.sourceTitle}</strong> (${typeLabel}) - <a href="${source.sourceUrl}" target="_blank" rel="noopener noreferrer">Read More</a>`;
         });
 
-        return `\n\n**Reputable Sources:**\n${formattedSources.join('\n')}`;
+        return `\n\n<strong>Other Helpful Sources:</strong>\n${formattedSources.join('\n')}`;
     }
 
     /**

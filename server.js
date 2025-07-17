@@ -5,10 +5,11 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { SERVER_AI_CONFIG, createOpenAIRequest, getServerErrorMessage, validateConfiguration, getConfigurationStatus } from './server-ai-config.js';
+import { AI_CONFIG } from './ai-config.js';
 import { DataIntegrationService } from './data-integration-service.js';
 import { DataVerificationMiddleware } from './data-verification-middleware.js';
 import { getBaseUrl, getApiBaseUrl } from './utils/url-helper.js';
-import { addSourcesToResponse } from './utils/source-verifier.js';
+
 import { getCorsOrigins } from './config/server-urls.js';
 
 // Load environment variables
@@ -168,8 +169,8 @@ app.post('/api/chat', async (req, res) => {
       
       contextData = [
         ...articles.slice(0, 3), // Top 3 relevant articles
-        ...settlements.slice(0, 2), // Top 2 settlement data
-        ...lawFirms.slice(0, 2) // Top 2 law firms
+        ...settlements.slice(0, 2) // Top 2 settlement data
+        // Removed law firms from context to prevent AI from referencing their websites
       ];
     } catch (error) {
       console.warn('Could not fetch context data:', error.message);
@@ -178,34 +179,29 @@ app.post('/api/chat', async (req, res) => {
     // Prepare messages for OpenAI
     const messages = [];
     
-    // Use LIA-specific system message if this is an active case
+    // Use appropriate system message based on whether this is an LIA active case
+    let selectedSystemMessage;
     if (liaCaseInfo && liaCaseInfo.isActive) {
-      messages.push({
-        role: 'system',
-        content: SERVER_AI_CONFIG.systemMessages.liaActiveCase(liaCaseInfo)
-      });
+      // Use LIA active case system message for active cases
+      selectedSystemMessage = SERVER_AI_CONFIG.systemMessages.liaActiveCase(liaCaseInfo);
     } else {
-      // Use the general system message to prevent unwanted legal referrals
-      messages.push({
-        role: 'system',
-        content: SERVER_AI_CONFIG.systemMessages.general
-      });
+      // Use general system message for other cases
+      selectedSystemMessage = SERVER_AI_CONFIG.systemMessages.general;
     }
+    
+    messages.push({
+      role: 'system',
+      content: selectedSystemMessage
+    });
+    
+    console.log('🔍 SYSTEM MESSAGE BEING SENT TO AI:', selectedSystemMessage);
 
     // Add context data if available
-    if (contextData.length > 0 || (liaCaseInfo && liaCaseInfo.isActive)) {
+    if (contextData.length > 0) {
       let contextMessage = '';
       
       if (contextData.length > 0) {
         contextMessage += `RELEVANT DATA FROM OUR DATABASE:\n${JSON.stringify(contextData, null, 2)}\n\n`;
-      }
-      
-      if (liaCaseInfo && liaCaseInfo.isActive) {
-        contextMessage += `LIA ACTIVE CASE DETECTED:\nLegal Injury Advocates is currently handling ${liaCaseInfo.name} cases.\nCase Type: ${liaCaseInfo.caseType}\nDescription: ${liaCaseInfo.description}\nKeywords: ${liaCaseInfo.keywords.join(', ')}\n\n`;
-        contextMessage += `CRITICAL: Since this relates to an active LIA case, you MUST mention that users can start their claim at legalinjuryadvocates.com.`;
-      } else {
-        contextMessage += `NO ACTIVE LIA CASE DETECTED:\nThis condition is NOT currently handled by Legal Injury Advocates.\n\n`;
-        contextMessage += `CRITICAL: Do NOT mention Legal Injury Advocates or any legal referrals. Only provide general information about the condition.`;
       }
       
       contextMessage += `\n\nUser Question: ${message}\n\nIMPORTANT: Only use information from the provided data or explicitly state when you don't have specific information.`;
@@ -229,6 +225,7 @@ app.post('/api/chat', async (req, res) => {
 
     const aiResponse = completion.choices[0].message.content;
     console.log('OpenAI response received:', aiResponse.substring(0, 100) + '...');
+    console.log('🔍 FULL AI RESPONSE:', aiResponse);
 
     // Verify response against data sources
     const verification = await verificationMiddleware.verifyResponse(aiResponse, message);
@@ -239,6 +236,84 @@ app.post('/api/chat', async (req, res) => {
       const sourcesText = dataService.formatReputableSourcesForResponse(reputableSources);
       responseWithSources += sourcesText;
     }
+    
+    // Add legal referral message if LIA case is detected and no referral already exists
+    if (liaCaseInfo && liaCaseInfo.isActive) {
+      // Check if the response already contains a referral message
+      const lowerResponse = responseWithSources.toLowerCase();
+      const hasReferral = lowerResponse.includes('legal injury advocates') || 
+                         lowerResponse.includes('legalinjuryadvocates.com') ||
+                         lowerResponse.includes('start your claim');
+      
+      if (!hasReferral) {
+        responseWithSources += '\n\n' + AI_CONFIG.formatting.legalReferralMessage;
+      }
+    }
+    
+    console.log('🔍 RESPONSE AFTER SOURCES ADDED:', responseWithSources);
+    
+    // Remove ALL custom referral messages - only allow the exact generic referral message from AI_CONFIG
+    // Remove any referral message that contains "currently handling" followed by specific case details
+    responseWithSources = responseWithSources.replace(
+      /➡️\s*Legal Injury Advocates is currently handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    responseWithSources = responseWithSources.replace(
+      /Legal Injury Advocates is currently handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    
+    // Also remove any referral messages that mention specific case types or lawsuits
+    responseWithSources = responseWithSources.replace(
+      /➡️\s*Legal Injury Advocates[^.]*lawsuits?[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    responseWithSources = responseWithSources.replace(
+      /Legal Injury Advocates[^.]*lawsuits?[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    
+    // Remove any referral messages that mention specific case types (hair straightener, chemical, etc.)
+    responseWithSources = responseWithSources.replace(
+      /➡️\s*Legal Injury Advocates[^.]*(?:hair|chemical|straightener|relaxer)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    responseWithSources = responseWithSources.replace(
+      /Legal Injury Advocates[^.]*(?:hair|chemical|straightener|relaxer)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    
+    // Remove any referral messages that mention specific case types or conditions
+    responseWithSources = responseWithSources.replace(
+      /➡️\s*Legal Injury Advocates[^.]*(?:mesothelioma|asbestos|talcum|powder|roundup|glyphosate|pfas|paraquat)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    responseWithSources = responseWithSources.replace(
+      /Legal Injury Advocates[^.]*(?:mesothelioma|asbestos|talcum|powder|roundup|glyphosate|pfas|paraquat)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    
+    // Remove any referral messages that mention "affected by" or "been affected by"
+    responseWithSources = responseWithSources.replace(
+      /➡️\s*If you or a loved one has been affected by[^.]*\.\s*Legal Injury Advocates[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    responseWithSources = responseWithSources.replace(
+      /If you or a loved one has been affected by[^.]*\.\s*Legal Injury Advocates[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    
+    // Remove any referral messages that mention "actively handling" or "currently handling"
+    responseWithSources = responseWithSources.replace(
+      /➡️\s*Legal Injury Advocates is (?:actively|currently) handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    responseWithSources = responseWithSources.replace(
+      /Legal Injury Advocates is (?:actively|currently) handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
+      ''
+    );
+    
+    console.log('🔍 RESPONSE AFTER REGEX CLEANUP:', responseWithSources);
     
     res.json({ 
       response: responseWithSources,
