@@ -250,8 +250,85 @@ app.post('/api/chat', async (req, res) => {
     // Remove systemMessage from options since it's already handled in messages
     const { systemMessage: _, ...openAIOptions } = options;
     const openAIRequest = createOpenAIRequest(messages, openAIOptions);
-    const completion = await openai.chat.completions.create(openAIRequest);
+    
+    // Check if streaming is requested
+    const isStreaming = req.headers.accept === 'text/event-stream';
+    
+    if (isStreaming) {
+      // Set up Server-Sent Events for streaming
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      });
 
+      try {
+        // Enable streaming in OpenAI request
+        const streamRequest = { ...openAIRequest, stream: true };
+        const stream = await openai.chat.completions.create(streamRequest);
+
+        let fullResponse = '';
+        
+        for await (const chunk of stream) {
+          const content = chunk.choices[0]?.delta?.content || '';
+          if (content) {
+            fullResponse += content;
+            
+            // Send each chunk to the client
+            res.write(`data: ${JSON.stringify({ content, type: 'chunk' })}\n\n`);
+          }
+        }
+
+        // Process the full response for sources and referrals
+        const verification = await verificationMiddleware.verifyResponse(fullResponse, message);
+        
+        // Send sources as additional content chunks
+        if (reputableSources.length > 0) {
+          const sourcesText = dataService.formatReputableSourcesForResponse(reputableSources);
+          res.write(`data: ${JSON.stringify({ content: sourcesText, type: 'chunk' })}\n\n`);
+        }
+
+        if (liaCaseInfo && liaCaseInfo.isActive) {
+          const referralMessage = `\n\n➡️ **Legal Injury Advocates is currently accepting new cases. You can start your claim at** [legalinjuryadvocates.com](https://legalinjuryadvocates.com).`;
+          res.write(`data: ${JSON.stringify({ content: referralMessage, type: 'chunk' })}\n\n`);
+        }
+
+        // Send final metadata
+        res.write(`data: ${JSON.stringify({ 
+          type: 'complete',
+          verified: verification.verified,
+          warnings: verification.warnings,
+          reputableSources: reputableSources.map(source => ({
+            title: source.sourceTitle,
+            url: source.sourceUrl,
+            type: source.sourceType,
+            priority: source.priority
+          })),
+          liaCase: liaCaseInfo && liaCaseInfo.isActive ? {
+            isActive: true,
+            caseType: liaCaseInfo.caseType,
+            name: liaCaseInfo.name,
+            description: liaCaseInfo.description,
+            keywords: liaCaseInfo.keywords
+          } : null
+        })}\n\n`);
+        
+        res.write(`data: [DONE]\n\n`);
+        res.end();
+        return;
+        
+      } catch (error) {
+        console.error('OpenAI streaming error:', error);
+        res.write(`data: ${JSON.stringify({ type: 'error', error: getServerErrorMessage(error) })}\n\n`);
+        res.end();
+        return;
+      }
+    }
+
+    // Non-streaming response (existing behavior)
+    const completion = await openai.chat.completions.create(openAIRequest);
     const aiResponse = completion.choices[0].message.content;
     console.log('OpenAI response received:', aiResponse.substring(0, 100) + '...');
 

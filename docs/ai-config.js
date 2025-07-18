@@ -232,7 +232,22 @@ IMPORTANT: DO NOT include any specific referral messages - the system will add t
     ui: {
         loadingMessage: 'AI is thinking...',
         thinkingMessage: 'AI is analyzing your question...',
-        errorPrefix: 'Sorry, I encountered an error: '
+        errorPrefix: 'Sorry, I encountered an error: ',
+        
+        // Typing Animation Configuration
+        typing: {
+            method: 'streaming', // 'streaming', 'improved', 'word-by-word', 'original'
+            enableStreaming: true, // Enable real-time streaming like OpenAI ChatGPT
+            adaptiveSpeed: true, // Adjust speed based on text length
+            naturalPauses: true, // Add pauses at punctuation
+            baseSpeed: 35, // Base typing speed in milliseconds
+            minSpeed: 15, // Minimum (fastest) typing speed
+            maxSpeed: 50, // Maximum (slowest) typing speed
+            wordDelay: 150, // Base delay between words (for word-by-word mode)
+            punctuationPause: 2.5, // Multiplier for pauses after punctuation
+            commaPause: 1.5, // Multiplier for pauses after commas
+            spacePause: 0.8 // Multiplier for pauses after spaces
+        }
     }
 };
 
