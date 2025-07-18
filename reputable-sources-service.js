@@ -111,16 +111,45 @@ export class ReputableSourcesService {
             });
 
             // Always include at least one LIA source (the highest scoring one)
-            const selectedLIASource = scoredLIASources.length > 0 ? [scoredLIASources[0]] : this.getFallbackLIASources();
+            let selectedLIASource = scoredLIASources.length > 0 ? [scoredLIASources[0]] : this.getFallbackLIASources();
+            
+            // Deduplicate LIA sources by URL (in case there are multiple LIA sources with same URL)
+            const liaUrls = new Set();
+            selectedLIASource = selectedLIASource.filter(source => {
+                if (liaUrls.has(source.sourceUrl)) {
+                    console.log(`🔄 Skipping duplicate LIA URL: ${source.sourceUrl}`);
+                    return false;
+                }
+                liaUrls.add(source.sourceUrl);
+                return true;
+            });
+            
+            // Start with the guaranteed LIA source(s)
+            const finalSources = [...selectedLIASource];
+            const usedUrls = new Set(selectedLIASource.map(source => source.sourceUrl));
             
             // Calculate remaining slots for regular sources
             const remainingSlots = Math.max(0, limit - selectedLIASource.length);
-            const selectedRegularSources = scoredRegularSources.slice(0, remainingSlots);
+            
+            // Add regular sources, but skip duplicates
+            const selectedRegularSources = [];
+            for (const source of scoredRegularSources) {
+                if (selectedRegularSources.length >= remainingSlots) break;
+                
+                // Skip if we already have this URL
+                if (usedUrls.has(source.sourceUrl)) {
+                    console.log(`🔄 Skipping duplicate URL: ${source.sourceUrl}`);
+                    continue;
+                }
+                
+                selectedRegularSources.push(source);
+                usedUrls.add(source.sourceUrl);
+            }
+            
+            // Add the non-duplicate regular sources to final results
+            finalSources.push(...selectedRegularSources);
 
-            // Combine and return results
-            const finalSources = [...selectedLIASource, ...selectedRegularSources];
-
-            console.log(`🔍 Found ${finalSources.length} relevant sources for query: "${query}" (including ${selectedLIASource.length} LIA sources)`);
+            console.log(`🔍 Found ${finalSources.length} relevant sources for query: "${query}" (including ${selectedLIASource.length} LIA sources, ${selectedRegularSources.length} unique regular sources)`);
             
             return finalSources;
 

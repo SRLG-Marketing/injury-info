@@ -117,6 +117,7 @@ Consistent across all servers:
 - ✅ LIA sources appear in every response
 - ✅ 4 sources returned per query
 - ✅ LIA sources show their original source type (e.g., "Legal Injury Advocates", "LIA Blog Post")
+- ✅ No duplicate URLs appear in source lists
 - ✅ Fallback sources work when Google Sheets unavailable
 
 ## 🚀 Deployment Readiness
@@ -152,6 +153,7 @@ The system is fully consistent when:
 - ✅ Every response includes at least 1 LIA source
 - ✅ LIA sources appear first in the list
 - ✅ LIA sources show their original source type (not mapped to generic labels)
+- ✅ No duplicate URLs appear in source lists
 - ✅ Sources are properly formatted and linked
 - ✅ Fallback protection works across all servers
 

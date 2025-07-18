@@ -53,7 +53,8 @@ Add these columns to your existing Google Sheets "Reputable_Sources" tab:
 ### How Sources Are Selected
 1. **LIA Sources**: System finds all LIA sources, scores them, picks highest scoring
 2. **Regular Sources**: System finds relevant medical/government sources, scores them
-3. **Final Selection**: 1 LIA source + 3 best regular sources = 4 total sources
+3. **Deduplication**: System removes any duplicate URLs to ensure unique sources
+4. **Final Selection**: 1 LIA source + 3 best unique regular sources = 4 total sources
 
 ## 🧪 Testing
 
@@ -90,6 +91,7 @@ Mesothelioma is a serious cancer that affects the lining of the lungs...
 3. **Improved Conversions**: LIA links appear in every response
 4. **Professional Appearance**: Sources are properly formatted and labeled
 5. **Fallback Protection**: System works even when Google Sheets is down
+6. **No Duplicates**: Advanced deduplication ensures no duplicate URLs appear
 
 ## 🔍 Monitoring
 
@@ -138,5 +140,6 @@ The system is working correctly when:
 - ✅ LIA sources show their original source type (e.g., "Legal Injury Advocates", "LIA Blog Post")
 - ✅ System works even when Google Sheets is unavailable
 - ✅ Sources are relevant to user queries
+- ✅ No duplicate URLs appear in the source list
 
 Your users now have consistent access to legal assistance alongside authoritative medical and government information! 
