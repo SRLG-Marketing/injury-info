@@ -161,7 +161,7 @@ app.post('/api/chat', async (req, res) => {
       liaCaseInfo = await dataService.checkLIAActiveCase(message);
       
       // Get reputable sources for the query
-      reputableSources = await dataService.getReputableSources(message, 3);
+      reputableSources = await dataService.getReputableSources(message, 4);
       
       contextData = [
         ...articles.slice(0, 3), // Top 3 relevant articles

@@ -195,4 +195,79 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     });
 }
 
-export { testReputableSources }; 
+export { testReputableSources };
+
+/**
+ * Test script for reputable sources with LIA inclusion
+ */
+
+async function testLIASourceInclusion() {
+    console.log('🧪 Testing LIA Source Inclusion in Reputable Sources...\n');
+    
+    // Test without Google Sheets (using fallback)
+    const reputableSources = new ReputableSourcesService();
+    
+    const testQueries = [
+        'What is mesothelioma?',
+        'PFAS exposure symptoms',
+        'Roundup lawsuit information',
+        'Legal help for injury claims',
+        'How to file a personal injury claim'
+    ];
+    
+    for (const query of testQueries) {
+        console.log(`🔍 Testing query: "${query}"`);
+        
+        try {
+            const sources = await reputableSources.findRelevantSources(query, 4);
+            
+            console.log(`✅ Found ${sources.length} sources:`);
+            
+            let liaSourceFound = false;
+            sources.forEach((source, index) => {
+                const isLIA = reputableSources.isLIASource(source);
+                if (isLIA) liaSourceFound = true;
+                
+                console.log(`   ${index + 1}. ${source.sourceTitle} (${source.sourceType}) ${isLIA ? '👑 LIA' : ''}`);
+                console.log(`      URL: ${source.sourceUrl}`);
+                console.log(`      Score: ${source.score || 'N/A'}`);
+            });
+            
+            if (liaSourceFound) {
+                console.log('✅ LIA source successfully included!\n');
+            } else {
+                console.log('❌ No LIA source found!\n');
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error testing query "${query}":`, error.message);
+        }
+    }
+    
+    // Test with empty query
+    console.log('🔍 Testing empty query...');
+    const emptyResults = await reputableSources.findRelevantSources('', 4);
+    console.log(`✅ Empty query returned ${emptyResults.length} sources\n`);
+    
+    // Test LIA source detection
+    console.log('🔍 Testing LIA source detection...');
+    const testSources = [
+        { sourceTitle: 'Legal Injury Advocates - Free Case Evaluation', sourceUrl: 'https://legalinjuryadvocates.com' },
+        { sourceTitle: 'Mayo Clinic - Health Info', sourceUrl: 'https://mayoclinic.org' },
+        { sourceUrl: 'https://legalinjuryadvocates.com/mesothelioma' },
+        { sourceType: 'LIA' }
+    ];
+    
+    testSources.forEach((source, index) => {
+        const isLIA = reputableSources.isLIASource(source);
+        console.log(`   Source ${index + 1}: ${isLIA ? '✅ LIA' : '❌ Not LIA'} - ${source.sourceTitle || source.sourceUrl || 'Type: ' + source.sourceType}`);
+    });
+    
+    console.log('\n🎉 LIA Source Inclusion Test Complete!');
+}
+
+// Run the test
+testLIASourceInclusion().catch(error => {
+    console.error('❌ Test failed:', error);
+    process.exit(1);
+}); 

@@ -102,12 +102,14 @@ The `/api/chat` endpoint now includes reputable sources:
     {
       "title": "Mesothelioma - Mayo Clinic",
       "url": "https://www.mayoclinic.org/...",
-      "type": "Medical",
+      "type": "Medical Authority",
       "priority": 1
     }
   ]
 }
 ```
+
+**Note:** The `type` field shows exactly what you put in the `Source_Type` column in your Google Sheets - no mapping or processing is done.
 
 ## 📝 Best Practices
 
@@ -138,21 +140,15 @@ The `/api/chat` endpoint now includes reputable sources:
 ## 🛠️ Advanced Configuration
 
 ### Custom Source Types
-You can add custom source types by updating the `getSourceTypeLabel` method in `reputable-sources-service.js`:
+You can use ANY source type by simply putting it in the `Source_Type` column in your Google Sheets. The system now displays whatever you type exactly as you typed it.
 
-```javascript
-getSourceTypeLabel(sourceType) {
-  const labels = {
-    'Medical': 'Medical Authority',
-    'Government': 'Government Source',
-    'Research': 'Research Study',
-    'Legal': 'Legal Database',
-    'News': 'News Source',
-    'Custom': 'Custom Source' // Add your own
-  };
-  return labels[sourceType] || sourceType;
-}
-```
+**Examples:**
+- `Source_Type: "Medical Authority"` → Displays as `(Medical Authority)`
+- `Source_Type: "LIA Blog Post"` → Displays as `(LIA Blog Post)`
+- `Source_Type: "Custom Label"` → Displays as `(Custom Label)`
+- `Source_Type: "My Special Source"` → Displays as `(My Special Source)`
+
+**No coding required** - just edit your Google Sheets `Source_Type` column and it will appear exactly as you typed it in the AI responses.
 
 ### Adjusting Relevance Scoring
 Modify the scoring algorithm in `calculateRelevanceScore` method:

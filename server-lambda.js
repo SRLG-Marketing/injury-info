@@ -40,31 +40,98 @@ app.post('/api/chat', async (req, res) => {
 
     console.log('Received chat request:', { message, systemMessage: systemMessage?.substring(0, 100) + '...' });
 
+    // Initialize variables
+    let contextData = [];
+    let reputableSources = [];
+    let liaCaseInfo = null;
+    
+    // Get context data and reputable sources
+    try {
+      const articles = await dataService.searchArticles(message);
+      const settlements = await dataService.getSettlementData(message);
+      const lawFirms = await dataService.getLawFirms();
+      
+      // Check if this query relates to an LIA active case
+      liaCaseInfo = await dataService.checkLIAActiveCase(message);
+      
+      // Get reputable sources for the query (including LIA sources)
+      reputableSources = await dataService.getReputableSources(message, 4);
+      
+      contextData = [
+        ...articles.slice(0, 3), // Top 3 relevant articles
+        ...settlements.slice(0, 2) // Top 2 settlement data
+      ];
+    } catch (error) {
+      console.warn('Could not fetch context data:', error.message);
+    }
+
     // Prepare messages for OpenAI
     const messages = [];
     
-    if (systemMessage) {
+    // Use the general system message for all cases
+    const selectedSystemMessage = systemMessage || SERVER_AI_CONFIG.systemMessages.general;
+    
+    messages.push({
+      role: 'system',
+      content: selectedSystemMessage
+    });
+
+    // Add context data if available
+    if (contextData.length > 0) {
+      let contextMessage = '';
+      
+      if (contextData.length > 0) {
+        contextMessage += `RELEVANT DATA FROM OUR DATABASE:\n${JSON.stringify(contextData, null, 2)}\n\n`;
+      }
+      
+      contextMessage += `\n\nUser Question: ${message}\n\nIMPORTANT: Only use information from the provided data or explicitly state when you don't have specific information.`;
+      
       messages.push({
-        role: 'system',
-        content: systemMessage
+        role: 'user',
+        content: contextMessage
+      });
+    } else {
+      messages.push({
+        role: 'user',
+        content: message
       });
     }
-
-    messages.push({
-      role: 'user',
-      content: message
-    });
 
     // Call OpenAI API using centralized configuration
     const { systemMessage: _, ...openAIOptions } = options;
     const openAIRequest = createOpenAIRequest(messages, openAIOptions);
     const completion = await openai.chat.completions.create(openAIRequest);
 
-    const response = completion.choices[0].message.content;
+    let response = completion.choices[0].message.content;
     console.log('OpenAI response received:', response.substring(0, 100) + '...');
+
+    // Add reputable sources to the response
+    if (reputableSources.length > 0) {
+      const sourcesText = dataService.formatReputableSourcesForResponse(reputableSources);
+      response += sourcesText;
+    }
+
+    // Add Legal Injury Advocates referral for active cases
+    if (liaCaseInfo && liaCaseInfo.isActive) {
+      const referralMessage = `\n\n➡️ **Legal Injury Advocates is currently accepting new cases. You can start your claim at** [legalinjuryadvocates.com](https://legalinjuryadvocates.com).`;
+      response += referralMessage;
+    }
 
     res.json({ 
       response,
+      reputableSources: reputableSources.map(source => ({
+        title: source.sourceTitle,
+        url: source.sourceUrl,
+        type: source.sourceType,
+        priority: source.priority
+      })),
+      liaCase: liaCaseInfo && liaCaseInfo.isActive ? {
+        isActive: true,
+        caseType: liaCaseInfo.caseType,
+        name: liaCaseInfo.name,
+        description: liaCaseInfo.description,
+        keywords: liaCaseInfo.keywords
+      } : null,
       usage: completion.usage 
     });
 
@@ -268,6 +335,43 @@ app.post('/api/lia/check-case', async (req, res) => {
   } catch (error) {
     console.error('❌ Error in LIA case check:', error);
     res.status(500).json({ error: 'Failed to check LIA case' });
+  }
+});
+
+// API endpoint to get reputable sources for a query
+app.get('/api/reputable-sources', async (req, res) => {
+  try {
+    const { query, disease, limit = 4 } = req.query;
+    
+    if (!query && !disease) {
+      return res.status(400).json({ error: 'Either query or disease parameter is required' });
+    }
+    
+    let sources = [];
+    
+    if (query) {
+      sources = await dataService.getReputableSources(query, parseInt(limit));
+    } else if (disease) {
+      sources = await dataService.getReputableSourcesForDisease(disease, parseInt(limit));
+    }
+    
+    res.json({
+      sources: sources.map(source => ({
+        id: source.id,
+        diseaseAilment: source.diseaseAilment,
+        sourceTitle: source.sourceTitle,
+        sourceUrl: source.sourceUrl,
+        sourceType: source.sourceType,
+        priority: source.priority,
+        description: source.description,
+        lastUpdated: source.lastUpdated
+      })),
+      total: sources.length,
+      query: query || disease
+    });
+  } catch (error) {
+    console.error('❌ Error fetching reputable sources:', error);
+    res.status(500).json({ error: 'Failed to fetch reputable sources' });
   }
 });
 

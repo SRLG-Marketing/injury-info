@@ -65,9 +65,9 @@ export class ReputableSourcesService {
     }
 
     /**
-     * Find relevant sources for a user query
+     * Find relevant sources for a user query - Enhanced to always include LIA source
      */
-    async findRelevantSources(query, limit = 3) {
+    async findRelevantSources(query, limit = 4) {
         if (!query || typeof query !== 'string') {
             return [];
         }
@@ -76,80 +76,97 @@ export class ReputableSourcesService {
             const allSources = await this.getAllReputableSources();
             const queryWords = this.extractQueryWords(query);
             
-            // Early filtering for better performance with large datasets
-            const preFilteredSources = this.preFilterSources(allSources, queryWords, query);
+            // Separate LIA sources from regular sources
+            const liaSources = allSources.filter(source => this.isLIASource(source));
+            const regularSources = allSources.filter(source => !this.isLIASource(source));
             
-            // Score only the pre-filtered sources
-            const scoredSources = preFilteredSources.map(source => ({
+            // Early filtering for better performance with large datasets
+            const preFilteredRegularSources = this.preFilterSources(regularSources, queryWords, query);
+            
+            // Score regular sources
+            const scoredRegularSources = preFilteredRegularSources.map(source => ({
                 ...source,
                 score: this.calculateRelevanceScore(source, queryWords, query)
             }));
 
-            // Sort by score (highest first) then by priority
-            const relevantSources = scoredSources
-                .sort((a, b) => {
-                    // First sort by score (highest first)
-                    if (b.score !== a.score) {
-                        return b.score - a.score;
-                    }
-                    // Then sort by priority (lowest number first)
-                    return a.priority - b.priority;
-                })
-                .slice(0, limit);
+            // Score LIA sources
+            const scoredLIASources = liaSources.map(source => ({
+                ...source,
+                score: this.calculateRelevanceScore(source, queryWords, query)
+            }));
 
-            console.log(`🔍 Found ${relevantSources.length} relevant sources for query: "${query}" (searched ${allSources.length} total sources)`);
+            // Sort both arrays by score
+            scoredRegularSources.sort((a, b) => {
+                if (b.score !== a.score) {
+                    return b.score - a.score;
+                }
+                return a.priority - b.priority;
+            });
+
+            scoredLIASources.sort((a, b) => {
+                if (b.score !== a.score) {
+                    return b.score - a.score;
+                }
+                return a.priority - b.priority;
+            });
+
+            // Always include at least one LIA source (the highest scoring one)
+            const selectedLIASource = scoredLIASources.length > 0 ? [scoredLIASources[0]] : this.getFallbackLIASources();
             
-            return relevantSources;
+            // Calculate remaining slots for regular sources
+            const remainingSlots = Math.max(0, limit - selectedLIASource.length);
+            const selectedRegularSources = scoredRegularSources.slice(0, remainingSlots);
+
+            // Combine and return results
+            const finalSources = [...selectedLIASource, ...selectedRegularSources];
+
+            console.log(`🔍 Found ${finalSources.length} relevant sources for query: "${query}" (including ${selectedLIASource.length} LIA sources)`);
+            
+            return finalSources;
 
         } catch (error) {
             console.error('❌ Error finding relevant sources:', error);
-            return [];
+            // Return at least fallback LIA sources on error
+            return this.getFallbackLIASources();
         }
     }
 
     /**
-     * Pre-filter sources to improve performance with large datasets
+     * Check if a source is a Legal Injury Advocates source
      */
-    preFilterSources(allSources, queryWords, originalQuery) {
-        if (allSources.length <= 50) {
-            // For smaller datasets, return all sources for scoring
-            return allSources;
-        }
+    isLIASource(source) {
+        if (!source) return false;
+        
+        const sourceTitle = source.sourceTitle?.toLowerCase() || '';
+        const sourceUrl = source.sourceUrl?.toLowerCase() || '';
+        const sourceType = source.sourceType?.toLowerCase() || '';
+        
+        return sourceTitle.includes('legal injury advocates') || 
+               sourceTitle.includes('legalinjuryadvocates') ||
+               sourceUrl.includes('legalinjuryadvocates.com') ||
+               sourceType === 'lia' ||
+               sourceType === 'legal injury advocates';
+    }
 
-        const queryLower = originalQuery.toLowerCase();
-        const candidateSources = new Set();
-
-        // Use indexes for faster lookups
-        for (const word of queryWords) {
-            // Check keyword index
-            if (this.keywordIndex.has(word)) {
-                this.keywordIndex.get(word).forEach(source => candidateSources.add(source));
+    /**
+     * Get fallback Legal Injury Advocates sources
+     */
+    getFallbackLIASources() {
+        return [
+            {
+                id: 'lia_fallback_1',
+                diseaseAilment: 'Legal Assistance',
+                sourceTitle: 'Legal Injury Advocates - Free Case Evaluation',
+                sourceUrl: 'https://legalinjuryadvocates.com',
+                sourceType: 'LIA',
+                priority: 1,
+                keywords: 'legal help, injury claims, compensation, lawsuit, legal advice, case evaluation',
+                description: 'Free case evaluation and legal assistance for injury claims',
+                lastUpdated: new Date().toISOString().split('T')[0],
+                active: true,
+                source: 'fallback'
             }
-
-            // Check disease index
-            if (this.diseaseIndex.has(word)) {
-                this.diseaseIndex.get(word).forEach(source => candidateSources.add(source));
-            }
-        }
-
-        // Check for disease/ailment matches in the original query
-        for (const [disease, sources] of this.diseaseIndex.entries()) {
-            if (queryLower.includes(disease) || disease.includes(queryLower)) {
-                sources.forEach(source => candidateSources.add(source));
-            }
-        }
-
-        // Convert Set back to array
-        const preFiltered = Array.from(candidateSources);
-
-        // If pre-filtering is too restrictive, fall back to all sources
-        if (preFiltered.length < 5) {
-            console.log(`⚠️ Pre-filtering too restrictive (${preFiltered.length} sources), using all sources`);
-            return allSources;
-        }
-
-        console.log(`🔍 Pre-filtered ${allSources.length} sources down to ${preFiltered.length} candidates`);
-        return preFiltered;
+        ];
     }
 
     /**
@@ -313,32 +330,67 @@ export class ReputableSourcesService {
         }
 
         const formattedSources = sources.map(source => {
-            const typeLabel = this.getSourceTypeLabel(source.sourceType);
-            return `• <strong>${source.sourceTitle}</strong> (${typeLabel}) - <a href="${source.sourceUrl}" target="_blank" rel="noopener noreferrer">Read More</a>`;
+            return `• <strong>${source.sourceTitle}</strong> (${source.sourceType}) - <a href="${source.sourceUrl}" target="_blank" rel="noopener noreferrer">Read More</a>`;
         });
 
         return `\n\n<strong>Other Helpful Sources:</strong>\n${formattedSources.join('\n')}`;
     }
 
     /**
-     * Get user-friendly label for source type
+     * Get user-friendly label for source type - DEPRECATED: Now using source type directly
      */
     getSourceTypeLabel(sourceType) {
-        const labels = {
-            'Medical': 'Medical Authority',
-            'Government': 'Government Source',
-            'Research': 'Research Study',
-            'Legal': 'Legal Database',
-            'News': 'News Source'
-        };
-        return labels[sourceType] || sourceType;
+        // Just return the source type as-is from Google Sheets
+        return sourceType;
     }
 
     /**
-     * Get fallback sources when Google Sheets is unavailable
+     * Get fallback sources when Google Sheets is unavailable - Enhanced with LIA sources
      */
     getFallbackSources() {
-        return [];
+        return [
+            // Legal Injury Advocates fallback sources
+            {
+                id: 'lia_fallback_1',
+                diseaseAilment: 'Legal Assistance',
+                sourceTitle: 'Legal Injury Advocates - Free Case Evaluation',
+                sourceUrl: 'https://legalinjuryadvocates.com',
+                sourceType: 'LIA',
+                priority: 1,
+                keywords: 'legal help, injury claims, compensation, lawsuit, legal advice, case evaluation',
+                description: 'Free case evaluation and legal assistance for injury claims',
+                lastUpdated: new Date().toISOString().split('T')[0],
+                active: true,
+                source: 'fallback'
+            },
+            // Basic fallback sources for common conditions
+            {
+                id: 'fallback_mayo_1',
+                diseaseAilment: 'General Medical',
+                sourceTitle: 'Mayo Clinic - Health Information',
+                sourceUrl: 'https://www.mayoclinic.org',
+                sourceType: 'Medical',
+                priority: 2,
+                keywords: 'health, medical, symptoms, treatment, diagnosis',
+                description: 'Comprehensive medical information and health resources',
+                lastUpdated: new Date().toISOString().split('T')[0],
+                active: true,
+                source: 'fallback'
+            },
+            {
+                id: 'fallback_cdc_1',
+                diseaseAilment: 'General Health',
+                sourceTitle: 'CDC - Health Information',
+                sourceUrl: 'https://www.cdc.gov',
+                sourceType: 'Government',
+                priority: 2,
+                keywords: 'health, disease, prevention, public health',
+                description: 'Official health information from the CDC',
+                lastUpdated: new Date().toISOString().split('T')[0],
+                active: true,
+                source: 'fallback'
+            }
+        ];
     }
 
     /**
@@ -427,5 +479,50 @@ export class ReputableSourcesService {
         } catch (_) {
             return false;
         }
+    }
+
+    /**
+     * Pre-filter sources to improve performance with large datasets
+     */
+    preFilterSources(allSources, queryWords, originalQuery) {
+        if (allSources.length <= 50) {
+            // For smaller datasets, return all sources for scoring
+            return allSources;
+        }
+
+        const queryLower = originalQuery.toLowerCase();
+        const candidateSources = new Set();
+
+        // Use indexes for faster lookups
+        for (const word of queryWords) {
+            // Check keyword index
+            if (this.keywordIndex.has(word)) {
+                this.keywordIndex.get(word).forEach(source => candidateSources.add(source));
+            }
+
+            // Check disease index
+            if (this.diseaseIndex.has(word)) {
+                this.diseaseIndex.get(word).forEach(source => candidateSources.add(source));
+            }
+        }
+
+        // Check for disease/ailment matches in the original query
+        for (const [disease, sources] of this.diseaseIndex.entries()) {
+            if (queryLower.includes(disease) || disease.includes(queryLower)) {
+                sources.forEach(source => candidateSources.add(source));
+            }
+        }
+
+        // Convert Set back to array
+        const preFiltered = Array.from(candidateSources);
+
+        // If pre-filtering is too restrictive, fall back to all sources
+        if (preFiltered.length < 5) {
+            console.log(`⚠️ Pre-filtering too restrictive (${preFiltered.length} sources), using all sources`);
+            return allSources;
+        }
+
+        console.log(`🔍 Pre-filtered ${allSources.length} sources down to ${preFiltered.length} candidates`);
+        return preFiltered;
     }
 } 
