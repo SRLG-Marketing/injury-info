@@ -42,31 +42,137 @@ app.post('/api/chat', async (req, res) => {
     // Log the query for analytics (lightweight HubSpot contact notes)
     await dataService.logQuery(message, 'chatbot');
 
+    // Get relevant data for context
+    let contextData = [];
+    let liaCaseInfo = null;
+    let reputableSources = [];
+    try {
+      const articles = await dataService.searchArticles(message);
+      const settlements = await dataService.getSettlementData(message);
+      
+      // Check if this query relates to an LIA active case
+      liaCaseInfo = await dataService.checkLIAActiveCase(message);
+      
+      // Get reputable sources for the query
+      reputableSources = await dataService.getReputableSources(message, 4);
+      
+      // Smart law firm inclusion - only for legal-related queries (expanded for environmental/toxic exposure cases)
+      const isLegalQuery = /\b(lawyer|attorney|legal|firm|representation|claim|lawsuit|compensation|settlement|case|court|litigation|sue|suing|damages|verdict|jury|judge|trial|contaminated|contamination|exposure|exposed|cancer|harm|injury|injured|affected|victims|toxic|poisoning|illness|disease|negligence|liable|liability|wrongful|malpractice|class action|mass tort)\b/i.test(message);
+      
+      // Get law firms with smart filtering based on the query
+      const lawFirms = isLegalQuery ? await dataService.getLawFirms(message) : [];
+      
+      // Debug: Log which firms were selected
+      if (isLegalQuery && lawFirms.length > 0) {
+        console.log(`🔍 Smart filtering found ${lawFirms.length} relevant law firms:`);
+        lawFirms.forEach((firm, index) => {
+          console.log(`  ${index + 1}. ${firm.name} (${firm.location}) - Specialties: ${firm.specialties.join(', ')}`);
+        });
+      }
+      
+      // Anonymize law firm data - remove contact info and websites
+      const sanitizedLawFirms = isLegalQuery ? lawFirms.slice(0, 3).map(firm => ({
+        name: firm.name,
+        location: firm.location,
+        specialties: firm.specialties,
+        experience: firm.experience,
+        successRate: firm.successRate,
+        notableSettlements: firm.notableSettlements,
+        source: 'law_firm_directory'
+        // Removed: website, phone, direct contact info
+      })) : [];
+      
+      contextData = [
+        ...articles.slice(0, 3), // Top 3 relevant articles
+        ...settlements.slice(0, 2), // Top 2 settlement data
+        ...sanitizedLawFirms // Top 3 relevant law firms (legal queries only, no contact info)
+      ];
+      
+      // Log context data for debugging
+      if (sanitizedLawFirms.length > 0) {
+        console.log(`📊 Including ${sanitizedLawFirms.length} law firms in context for legal query`);
+        console.log('📋 Law firm data:', JSON.stringify(sanitizedLawFirms, null, 2));
+      } else {
+        console.log('📋 No law firm data included - query did not trigger legal detection');
+        console.log('📋 Legal query test result:', isLegalQuery);
+      }
+    } catch (error) {
+      console.warn('Could not fetch context data:', error.message);
+    }
+
     // Prepare messages for OpenAI
     const messages = [];
     
-    if (systemMessage) {
+    // Use the general system message
+    const selectedSystemMessage = systemMessage || SERVER_AI_CONFIG.systemMessages.general;
+    
+    messages.push({
+      role: 'system',
+      content: selectedSystemMessage
+    });
+
+    // Add context data if available
+    if (contextData.length > 0) {
+      let contextMessage = '';
+      
+      if (contextData.length > 0) {
+        contextMessage += `RELEVANT DATA FROM OUR DATABASE:\n${JSON.stringify(contextData, null, 2)}\n\n`;
+      }
+      
+      contextMessage += `\n\nUser Question: ${message}\n\nCRITICAL INSTRUCTIONS: 
+      1. ANALYZE the provided data above and USE it to answer the question
+      2. If law firm data is provided, you HAVE the information needed - use it to provide helpful guidance
+      3. Reference actual specialties, locations, and case types from the data
+      4. DO NOT mention specific firm names, contact information, or websites
+      5. DO NOT say "I don't have specific information" when data is provided above
+      6. Focus on geographic coverage, specialties, and case types from the actual data`;
+      
       messages.push({
-        role: 'system',
-        content: systemMessage
+        role: 'user',
+        content: contextMessage
+      });
+    } else {
+      messages.push({
+        role: 'user',
+        content: message
       });
     }
-
-    messages.push({
-      role: 'user',
-      content: message
-    });
 
     // Call OpenAI API using centralized configuration
     const { systemMessage: _, ...openAIOptions } = options;
     const openAIRequest = createOpenAIRequest(messages, openAIOptions);
     const completion = await openai.chat.completions.create(openAIRequest);
 
-    const response = completion.choices[0].message.content;
+    let response = completion.choices[0].message.content;
     console.log('OpenAI response received:', response.substring(0, 100) + '...');
+
+    // Add reputable sources to the response
+    if (reputableSources.length > 0) {
+      const sourcesText = dataService.formatReputableSourcesForResponse(reputableSources);
+      response += sourcesText;
+    }
+
+    // Add Legal Injury Advocates referral for active cases
+    if (liaCaseInfo && liaCaseInfo.isActive) {
+      const referralMessage = `\n\n➡️ **Legal Injury Advocates is currently accepting new cases. You can start your claim at** [legalinjuryadvocates.com](https://legalinjuryadvocates.com).`;
+      response += referralMessage;
+    }
 
     res.json({ 
       response,
+      reputableSources: reputableSources.map(source => ({
+        title: source.sourceTitle,
+        url: source.sourceUrl,
+        type: source.sourceType,
+        priority: source.priority
+      })),
+      liaCase: liaCaseInfo && liaCaseInfo.isActive ? {
+        isActive: true,
+        caseType: liaCaseInfo.caseType,
+        name: liaCaseInfo.name,
+        description: liaCaseInfo.description,
+        keywords: liaCaseInfo.keywords
+      } : null,
       usage: completion.usage 
     });
 
