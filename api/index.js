@@ -148,11 +148,12 @@ app.post('/api/chat', async (req, res) => {
     if (isStreaming) {
       // Set up Server-Sent Events for streaming
       res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
+        'Content-Type': 'text/event-stream; charset=utf-8',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
+        'Content-Encoding': 'identity',
       });
 
       try {
@@ -168,19 +169,19 @@ app.post('/api/chat', async (req, res) => {
             fullResponse += content;
             
             // Send each chunk to the client
-            res.write(`data: ${JSON.stringify({ content, type: 'chunk' })}\n\n`);
+            res.write(`data: ${JSON.stringify({ content, type: 'chunk' })}\n\n`, 'utf8');
           }
         }
 
         // Send sources as additional content chunks
         if (reputableSources.length > 0) {
           const sourcesText = dataService.formatReputableSourcesForResponse(reputableSources);
-          res.write(`data: ${JSON.stringify({ content: sourcesText, type: 'chunk' })}\n\n`);
+          res.write(`data: ${JSON.stringify({ content: sourcesText, type: 'chunk' })}\n\n`, 'utf8');
         }
 
         if (liaCaseInfo && liaCaseInfo.isActive) {
           const referralMessage = `\n\n➡️ **Legal Injury Advocates is currently accepting new cases. You can start your claim at** [legalinjuryadvocates.com](https://legalinjuryadvocates.com).`;
-          res.write(`data: ${JSON.stringify({ content: referralMessage, type: 'chunk' })}\n\n`);
+          res.write(`data: ${JSON.stringify({ content: referralMessage, type: 'chunk' })}\n\n`, 'utf8');
         }
 
         // Send final metadata
@@ -199,15 +200,15 @@ app.post('/api/chat', async (req, res) => {
             description: liaCaseInfo.description,
             keywords: liaCaseInfo.keywords
           } : null
-        })}\n\n`);
+        })}\n\n`, 'utf8');
         
-        res.write(`data: [DONE]\n\n`);
+        res.write(`data: [DONE]\n\n`, 'utf8');
         res.end();
         return;
         
       } catch (error) {
         console.error('OpenAI streaming error:', error);
-        res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`, 'utf8');
         res.end();
         return;
       }
@@ -230,6 +231,7 @@ app.post('/api/chat', async (req, res) => {
       response += referralMessage;
     }
 
+    res.set('Content-Type', 'application/json; charset=utf-8');
     res.json({ 
       response,
       reputableSources: reputableSources.map(source => ({
