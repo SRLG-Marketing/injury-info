@@ -155,7 +155,6 @@ app.post('/api/chat', async (req, res) => {
     try {
       const articles = await dataService.searchArticles(message);
       const settlements = await dataService.getSettlementData(message);
-      const lawFirms = await dataService.getLawFirms();
       
       // Check if this query relates to an LIA active case
       liaCaseInfo = await dataService.checkLIAActiveCase(message);
@@ -163,11 +162,46 @@ app.post('/api/chat', async (req, res) => {
       // Get reputable sources for the query
       reputableSources = await dataService.getReputableSources(message, 4);
       
+      // Smart law firm inclusion - only for legal-related queries (expanded for environmental/toxic exposure cases)
+      const isLegalQuery = /\b(lawyer|attorney|legal|firm|representation|claim|lawsuit|compensation|settlement|case|court|litigation|sue|suing|damages|verdict|jury|judge|trial|contaminated|contamination|exposure|exposed|cancer|harm|injury|injured|affected|victims|toxic|poisoning|illness|disease|negligence|liable|liability|wrongful|malpractice|class action|mass tort)\b/i.test(message);
+      
+      // Get law firms with smart filtering based on the query
+      const lawFirms = isLegalQuery ? await dataService.getLawFirms(message) : [];
+      
+      // Debug: Log which firms were selected
+      if (isLegalQuery && lawFirms.length > 0) {
+        console.log(`🔍 Smart filtering found ${lawFirms.length} relevant law firms:`);
+        lawFirms.forEach((firm, index) => {
+          console.log(`  ${index + 1}. ${firm.name} (${firm.location}) - Specialties: ${firm.specialties.join(', ')}`);
+        });
+      }
+      
+      // Anonymize law firm data - remove contact info and websites
+      const sanitizedLawFirms = isLegalQuery ? lawFirms.slice(0, 3).map(firm => ({
+        name: firm.name,
+        location: firm.location,
+        specialties: firm.specialties,
+        experience: firm.experience,
+        successRate: firm.successRate,
+        notableSettlements: firm.notableSettlements,
+        source: 'law_firm_directory'
+        // Removed: website, phone, direct contact info
+      })) : [];
+      
       contextData = [
         ...articles.slice(0, 3), // Top 3 relevant articles
-        ...settlements.slice(0, 2) // Top 2 settlement data
-        // Removed law firms from context to prevent AI from referencing their websites
+        ...settlements.slice(0, 2), // Top 2 settlement data
+        ...sanitizedLawFirms // Top 2 relevant law firms (legal queries only, no contact info)
       ];
+      
+      // Log context data for debugging
+      if (sanitizedLawFirms.length > 0) {
+        console.log(`📊 Including ${sanitizedLawFirms.length} law firms in context for legal query`);
+        console.log('📋 Law firm data:', JSON.stringify(sanitizedLawFirms, null, 2));
+      } else {
+        console.log('📋 No law firm data included - query did not trigger legal detection');
+        console.log('📋 Legal query test result:', isLegalQuery);
+      }
     } catch (error) {
       console.warn('Could not fetch context data:', error.message);
     }
@@ -193,7 +227,13 @@ app.post('/api/chat', async (req, res) => {
         contextMessage += `RELEVANT DATA FROM OUR DATABASE:\n${JSON.stringify(contextData, null, 2)}\n\n`;
       }
       
-      contextMessage += `\n\nUser Question: ${message}\n\nIMPORTANT: Only use information from the provided data or explicitly state when you don't have specific information.`;
+      contextMessage += `\n\nUser Question: ${message}\n\nCRITICAL INSTRUCTIONS: 
+      1. ANALYZE the provided data above and USE it to answer the question
+      2. If law firm data is provided, you HAVE the information needed - use it to provide helpful guidance
+      3. Reference actual specialties, locations, and case types from the data
+      4. DO NOT mention specific firm names, contact information, or websites
+      5. DO NOT say "I don't have specific information" when data is provided above
+      6. Focus on geographic coverage, specialties, and case types from the actual data`;
       
       messages.push({
         role: 'user',
@@ -562,6 +602,17 @@ app.post('/api/cache/clear', async (req, res) => {
   }
 });
 
+// API endpoint to get cache statistics
+app.get('/api/cache/stats', async (req, res) => {
+  try {
+    const stats = dataService.getCacheStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('❌ Error getting cache stats:', error);
+    res.status(500).json({ error: 'Failed to get cache stats' });
+  }
+});
+
 // Test endpoint to verify API key
 app.get('/api/test', async (req, res) => {
   try {
@@ -791,6 +842,7 @@ app.listen(port, () => {
   console.log('   GET  /api/settlements - Get settlement data');
   console.log('   GET  /api/search/:condition - Search condition info');
   console.log('   POST /api/cache/clear - Clear cache');
+  console.log('   GET  /api/cache/stats - Get cache statistics');
   console.log('   GET  /api/test - Test OpenAI connection');
   console.log('   GET  /api/lia/active-cases - Get LIA active cases');
   console.log('   POST /api/lia/check-case - Check if a query relates to LIA active cases');

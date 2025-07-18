@@ -44,9 +44,17 @@ export class DataIntegrationService {
             this.reputableSources = null;
         }
 
-        // Cache for performance
+        // Cache for performance with configurable timeouts
         this.cache = new Map();
-        this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
+        this.cacheTimeouts = {
+            articles: 30 * 60 * 1000,        // 30 minutes - articles don't change often
+            lawFirms: 60 * 60 * 1000,        // 1 hour - law firm data is relatively stable
+            settlements: 15 * 60 * 1000,     // 15 minutes - settlement data may update more frequently
+            liaActiveCases: 10 * 60 * 1000,  // 10 minutes - active cases may change
+            reputableSources: 60 * 60 * 1000, // 1 hour - reputable sources are stable
+            default: 5 * 60 * 1000           // 5 minutes - fallback for other data
+        };
+        this.cacheTimeout = this.cacheTimeouts.default; // Keep for backward compatibility
     }
 
     /**
@@ -54,7 +62,7 @@ export class DataIntegrationService {
      */
     async getAllArticles() {
         const cacheKey = 'all_articles';
-        const cached = this.getFromCache(cacheKey);
+        const cached = this.getFromCache(cacheKey, 'articles');
         if (cached) return cached;
 
         try {
@@ -72,11 +80,11 @@ export class DataIntegrationService {
             if (allArticles.length === 0) {
                 console.log('📋 Using fallback article data');
                 const fallbackArticles = this.getFallbackArticles();
-                this.setCache(cacheKey, fallbackArticles);
+                this.setCache(cacheKey, fallbackArticles, 'articles');
                 return fallbackArticles;
             }
             
-            this.setCache(cacheKey, allArticles);
+            this.setCache(cacheKey, allArticles, 'articles');
             console.log(`✅ Fetched ${allArticles.length} articles total`);
             
             return allArticles;
@@ -219,7 +227,7 @@ export class DataIntegrationService {
      */
     async getLawFirms(specialty = null, location = null) {
         const cacheKey = `law_firms_${specialty}_${location}`;
-        const cached = this.getFromCache(cacheKey);
+        const cached = this.getFromCache(cacheKey, 'lawFirms');
         if (cached) return cached;
 
         try {
@@ -240,11 +248,11 @@ export class DataIntegrationService {
                         firm.specialties.some(s => s.toLowerCase().includes(specialty.toLowerCase()))
                     )
                     : fallbackFirms;
-                this.setCache(cacheKey, filteredFirms);
+                this.setCache(cacheKey, filteredFirms, 'lawFirms');
                 return filteredFirms;
             }
             
-            this.setCache(cacheKey, allFirms);
+            this.setCache(cacheKey, allFirms, 'lawFirms');
             return allFirms;
         } catch (error) {
             console.error('❌ Error fetching law firms:', error);
@@ -260,7 +268,7 @@ export class DataIntegrationService {
     }
 
     /**
-     * Get law firms from Google Sheets
+     * Get law firms from Google Sheets with smart filtering
      */
     async getLawFirmsFromGoogleSheets(specialty = null, location = null) {
         if (!this.googleSheets) {
@@ -273,30 +281,82 @@ export class DataIntegrationService {
             
             return data
                 .filter(firm => {
-                    if (specialty && !firm.Specialties?.toLowerCase().includes(specialty.toLowerCase())) {
+                    if (specialty && !this.firmHandlesSpecialty(firm, specialty)) {
                         return false;
                     }
-                    if (location && !firm.Location?.toLowerCase().includes(location.toLowerCase())) {
+                    if (location && !firm.Headquarters?.toLowerCase().includes(location.toLowerCase())) {
                         return false;
                     }
                     return true;
                 })
                 .map(firm => ({
-                    id: `sheets_firm_${firm.ID || Math.random()}`,
-                    name: firm.Name || firm['Firm Name'] || '',
-                    location: firm.Location || `${firm.City || ''}, ${firm.State || ''}`,
-                    phone: firm.Phone || '',
-                    website: firm.Website || '',
-                    specialties: this.parseList(firm.Specialties || ''),
-                    experience: firm['Years Experience'] || firm.Experience || '',
-                    successRate: firm['Success Rate'] || '',
-                    notableSettlements: this.parseList(firm['Notable Settlements'] || ''),
+                    id: `sheets_firm_${firm.Rank || Math.random()}`,
+                    name: firm.Firm_Name || '',
+                    location: firm.Headquarters || '',
+                    phone: '', // Not available in your current structure
+                    website: firm.Source_Link || '',
+                    specialties: this.parseList(firm.Notable_Mass_Torts || ''),
+                    experience: '', // Not available in your current structure
+                    successRate: '', // Not available in your current structure
+                    notableSettlements: this.parseList(firm.Notable_Mass_Torts || ''),
                     source: 'google_sheets'
                 }));
         } catch (error) {
             console.error('❌ Error reading law firms from sheets:', error);
             return [];
         }
+    }
+
+    /**
+     * Smart matching to see if a firm handles a particular specialty
+     */
+    firmHandlesSpecialty(firm, specialty) {
+        if (!firm.Notable_Mass_Torts || !specialty) return true;
+        
+        const firmSpecialties = firm.Notable_Mass_Torts.toLowerCase();
+        const searchTerm = specialty.toLowerCase();
+        
+        // Define related terms for better matching
+        const relatedTerms = {
+            'contaminated water': ['pfas', 'water', 'contamination', 'flint'],
+            'contamination': ['pfas', 'water', 'contamination', 'flint'],
+            'water': ['pfas', 'water', 'contamination', 'flint'],
+            'pfas': ['pfas', 'water', 'contamination', 'flint'],
+            'forever chemicals': ['pfas', 'water', 'contamination'],
+            'toxic exposure': ['pfas', 'asbestos', 'contamination', 'toxic'],
+            'environmental': ['pfas', 'water', 'contamination', 'asbestos'],
+            'cancer': ['mesothelioma', 'asbestos', 'talc', 'roundup', 'pfas'],
+            'mesothelioma': ['asbestos', 'mesothelioma'],
+            'roundup': ['roundup', 'glyphosate', 'herbicide'],
+            'talc': ['talc', 'talcum', 'powder'],
+            'hair relaxer': ['hair', 'relaxer', 'straightener'],
+            'opioid': ['opioid', 'opioids', 'painkiller'],
+            'earplug': ['3m', 'earplug', 'earplugs'],
+            'zantac': ['zantac', 'ranitidine'],
+            'paraquat': ['paraquat', 'herbicide'],
+            'hernia mesh': ['hernia', 'mesh'],
+            'suboxone': ['suboxone', 'addiction'],
+            'cpap': ['cpap', 'sleep', 'apnea'],
+            'xarelto': ['xarelto', 'blood thinner'],
+            'vioxx': ['vioxx', 'cox-2'],
+            'nec': ['nec', 'necrotizing', 'enterocolitis', 'formula']
+        };
+        
+        // Direct match first
+        if (firmSpecialties.includes(searchTerm)) {
+            return true;
+        }
+        
+        // Check related terms
+        for (const [key, terms] of Object.entries(relatedTerms)) {
+            if (searchTerm.includes(key) || key.includes(searchTerm)) {
+                return terms.some(term => firmSpecialties.includes(term));
+            }
+        }
+        
+        // Fallback: check if any word in the search term matches
+        const searchWords = searchTerm.split(/\s+/).filter(word => word.length > 2);
+        return searchWords.some(word => firmSpecialties.includes(word));
     }
 
     /**
@@ -334,7 +394,7 @@ export class DataIntegrationService {
      */
     async getSettlementData(condition, state = null) {
         const cacheKey = `settlement_${condition}_${state}`;
-        const cached = this.getFromCache(cacheKey);
+        const cached = this.getFromCache(cacheKey, 'settlements');
         if (cached) return cached;
 
         try {
@@ -350,11 +410,11 @@ export class DataIntegrationService {
             if (mergedData.length === 0) {
                 console.log('📋 Using fallback settlement data');
                 const fallbackData = this.getDefaultSettlementData(condition);
-                this.setCache(cacheKey, fallbackData);
+                this.setCache(cacheKey, fallbackData, 'settlements');
                 return fallbackData;
             }
             
-            this.setCache(cacheKey, mergedData);
+            this.setCache(cacheKey, mergedData, 'settlements');
             return mergedData;
         } catch (error) {
             console.error('❌ Error fetching settlement data:', error);
@@ -884,25 +944,62 @@ export class DataIntegrationService {
         ];
     }
 
-    // Cache management
-    getFromCache(key) {
+    // Cache management with configurable timeouts
+    getFromCache(key, cacheType = 'default') {
         const cached = this.cache.get(key);
-        if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+        const timeout = this.cacheTimeouts[cacheType] || this.cacheTimeouts.default;
+        
+        if (cached && Date.now() - cached.timestamp < timeout) {
+            console.log(`📋 Cache hit for ${key} (${cacheType})`);
             return cached.data;
         }
         this.cache.delete(key);
         return null;
     }
 
-    setCache(key, data) {
+    setCache(key, data, cacheType = 'default') {
         this.cache.set(key, {
             data,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            type: cacheType
         });
+        console.log(`💾 Cached ${key} (${cacheType}) for ${this.cacheTimeouts[cacheType] / 1000 / 60} minutes`);
     }
 
     clearCache() {
         this.cache.clear();
+    }
+
+    /**
+     * Get cache statistics
+     */
+    getCacheStats() {
+        const stats = {
+            totalItems: this.cache.size,
+            items: [],
+            byType: {}
+        };
+
+        for (const [key, value] of this.cache.entries()) {
+            const ageMinutes = Math.floor((Date.now() - value.timestamp) / 1000 / 60);
+            const type = value.type || 'default';
+            const maxAge = Math.floor(this.cacheTimeouts[type] / 1000 / 60);
+            
+            stats.items.push({
+                key,
+                type,
+                ageMinutes,
+                maxAgeMinutes: maxAge,
+                isValid: ageMinutes < maxAge
+            });
+
+            if (!stats.byType[type]) {
+                stats.byType[type] = 0;
+            }
+            stats.byType[type]++;
+        }
+
+        return stats;
     }
 
     /**
@@ -987,7 +1084,7 @@ export class DataIntegrationService {
      */
     async getLIAActiveCases() {
         const cacheKey = 'lia_active_cases';
-        const cached = this.getFromCache(cacheKey);
+        const cached = this.getFromCache(cacheKey, 'liaActiveCases');
         if (cached) return cached;
 
         if (!this.googleSheets) {
@@ -1104,7 +1201,7 @@ export class DataIntegrationService {
             };
 
             console.log(`✅ Fetched ${activeCases.length} active LIA cases out of ${allCases.length} total cases`);
-            this.setCache(cacheKey, result);
+            this.setCache(cacheKey, result, 'liaActiveCases');
             return result;
 
         } catch (error) {
