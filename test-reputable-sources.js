@@ -198,11 +198,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 export { testReputableSources };
 
 /**
- * Test script for reputable sources with LIA inclusion
+ * Test script for relevant source selection
  */
 
-async function testLIASourceInclusion() {
-    console.log('🧪 Testing LIA Source Inclusion in Reputable Sources...\n');
+async function testRelevantSourceSelection() {
+    console.log('🧪 Testing Relevant Source Selection in Reputable Sources...\n');
     
     // Test without Google Sheets (using fallback)
     const reputableSources = new ReputableSourcesService();
@@ -219,25 +219,17 @@ async function testLIASourceInclusion() {
         console.log(`🔍 Testing query: "${query}"`);
         
         try {
-            const sources = await reputableSources.findRelevantSources(query, 4);
+            const sources = await reputableSources.findRelevantSources(query, 5);
             
-            console.log(`✅ Found ${sources.length} sources:`);
+            console.log(`✅ Found ${sources.length} relevant sources:`);
             
-            let liaSourceFound = false;
             sources.forEach((source, index) => {
-                const isLIA = reputableSources.isLIASource(source);
-                if (isLIA) liaSourceFound = true;
-                
-                console.log(`   ${index + 1}. ${source.sourceTitle} (${source.sourceType}) ${isLIA ? '👑 LIA' : ''}`);
+                console.log(`   ${index + 1}. ${source.sourceTitle} (${source.sourceType})`);
                 console.log(`      URL: ${source.sourceUrl}`);
                 console.log(`      Score: ${source.score || 'N/A'}`);
             });
             
-            if (liaSourceFound) {
-                console.log('✅ LIA source successfully included!\n');
-            } else {
-                console.log('❌ No LIA source found!\n');
-            }
+            console.log('✅ Relevant sources selected successfully!\n');
             
         } catch (error) {
             console.error(`❌ Error testing query "${query}":`, error.message);
@@ -246,28 +238,14 @@ async function testLIASourceInclusion() {
     
     // Test with empty query
     console.log('🔍 Testing empty query...');
-    const emptyResults = await reputableSources.findRelevantSources('', 4);
+    const emptyResults = await reputableSources.findRelevantSources('', 5);
     console.log(`✅ Empty query returned ${emptyResults.length} sources\n`);
     
-    // Test LIA source detection
-    console.log('🔍 Testing LIA source detection...');
-    const testSources = [
-        { sourceTitle: 'Legal Injury Advocates - Free Case Evaluation', sourceUrl: 'https://legalinjuryadvocates.com' },
-        { sourceTitle: 'Mayo Clinic - Health Info', sourceUrl: 'https://mayoclinic.org' },
-        { sourceUrl: 'https://legalinjuryadvocates.com/mesothelioma' },
-        { sourceType: 'LIA' }
-    ];
-    
-    testSources.forEach((source, index) => {
-        const isLIA = reputableSources.isLIASource(source);
-        console.log(`   Source ${index + 1}: ${isLIA ? '✅ LIA' : '❌ Not LIA'} - ${source.sourceTitle || source.sourceUrl || 'Type: ' + source.sourceType}`);
-    });
-    
-    console.log('\n🎉 LIA Source Inclusion Test Complete!');
+    console.log('\n🎉 Relevant Source Selection Test Complete!');
 }
 
 // Run the test
-testLIASourceInclusion().catch(error => {
+testRelevantSourceSelection().catch(error => {
     console.error('❌ Test failed:', error);
     process.exit(1);
 }); 

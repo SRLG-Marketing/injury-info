@@ -9,7 +9,7 @@ All server files have been updated to ensure consistent Legal Injury Advocates (
 ### 1. **server.js** (Main Server) ✅
 - **Changes Made**: Already updated
 - **LIA Source Inclusion**: ✅ Implemented
-- **Limit**: 4 sources per response (1 LIA + 3 others)
+- **Limit**: 5 sources per response
 - **Endpoints**: `/api/chat`, `/api/reputable-sources`
 - **Status**: Fully compliant
 
@@ -21,20 +21,19 @@ All server files have been updated to ensure consistent Legal Injury Advocates (
   - Reputable sources with LIA inclusion
   - LIA case checking
   - Reputable sources endpoint
-- **Limit**: 4 sources per response
+- **Limit**: 5 sources per response
 - **Status**: Fully compliant
 
 ### 3. **data-integration-service.js** ✅
-- **Changes Made**: Updated default limit from 3 to 4
-- **Method**: `getReputableSources(query, limit = 4)`
+- **Changes Made**: Updated default limit from 3 to 5
+- **Method**: `getReputableSources(query, limit = 5)`
 - **LIA Source Inclusion**: ✅ Supports LIA detection
 - **Status**: Fully compliant
 
 ### 4. **reputable-sources-service.js** ✅
 - **Changes Made**: Core LIA inclusion logic implemented
 - **New Features**:
-  - `isLIASource()` method for detection
-  - `getFallbackLIASources()` for backup
+  - Simplified source selection without LIA-specific logic
   - Enhanced `findRelevantSources()` with LIA guarantee
 - **Status**: Fully compliant
 
@@ -73,7 +72,7 @@ All server files now use consistent LIA source detection:
 ### Source Limits
 - **Previous**: 3 sources per response
 - **Current**: 4 sources per response (1 LIA + 3 others)
-- **Guarantee**: At least 1 LIA source in every response
+- **Selection**: Only relevant sources based on query
 
 ### Fallback Protection
 - Built-in fallback LIA sources when Google Sheets unavailable
@@ -102,8 +101,8 @@ All server files now return:
 
 ### `/api/reputable-sources` Endpoint
 Consistent across all servers:
-- Default limit: 4 sources
-- Always includes LIA sources
+- Default limit: 5 sources
+- Includes relevant sources based on query
 - Proper error handling
 
 ## 🧪 Testing Status
@@ -111,7 +110,7 @@ Consistent across all servers:
 ### Tests Updated
 - ✅ `test-reputable-sources.js` - Updated for LIA inclusion
 - ✅ `test-lia-sources.js` - Created for API testing
-- ✅ All tests pass with 4 sources and guaranteed LIA inclusion
+- ✅ All tests pass with relevant source selection
 
 ### Test Results
 - ✅ LIA sources appear in every response
@@ -150,7 +149,7 @@ Consistent across all servers:
 
 The system is fully consistent when:
 - ✅ All servers return 4 reputable sources
-- ✅ Every response includes at least 1 LIA source
+- ✅ Every response includes relevant sources
 - ✅ LIA sources appear first in the list
 - ✅ LIA sources show their original source type (not mapped to generic labels)
 - ✅ No duplicate URLs appear in source lists

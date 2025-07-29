@@ -250,8 +250,7 @@
                     loadingDiv.remove();
                     
                     // Process response with sources and formatting
-                    const responseWithReferral = await addLegalReferralIfNeeded(response);
-                    const processedResponse = addArticleLinksToResponse(responseWithReferral);
+                                    const processedResponse = addArticleLinksToResponse(response);
                     const processedWithSources = processSourcesInResponse(processedResponse);
                     const htmlResponse = markdownToHtml(processedWithSources);
                     

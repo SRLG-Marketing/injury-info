@@ -2,18 +2,18 @@
 
 ## 🎯 Overview
 
-Your reputable sources system has been enhanced to **always include at least one Legal Injury Advocates (LIA) source** in every AI response. This ensures that LIA links appear consistently in the "Other Helpful Sources" section, providing users with legal assistance options alongside medical and government sources.
+Your reputable sources system has been updated to **include only relevant sources** in AI responses. This ensures that users receive the most helpful and contextually appropriate links in the "Other Helpful Sources" section, including medical and legal information sources that are directly relevant to their query.
 
 ## 🚀 How It Works
 
-### Automatic LIA Source Inclusion
-- **Total Sources**: 4 sources per response (increased from 3)
-- **LIA Sources**: Always includes 1 LIA source
-- **Other Sources**: 3 additional reputable sources (medical, government, research)
-- **Fallback Protection**: If Google Sheets is unavailable, fallback LIA sources are used
+### Relevant Source Selection
+- **Total Sources**: Up to 4 sources per response
+- **Source Types**: Medical, government, research, legal sources
+- **Relevance-Based**: Only includes sources that are relevant to the user's query
+- **Fallback Protection**: If Google Sheets is unavailable, fallback sources are used
 
 ### Source Priority
-1. **LIA Source**: Always included (highest scoring LIA source)
+1. **Relevant Sources**: Sources that best match the user's query
 2. **Medical Sources**: Mayo Clinic, NIH, CDC, etc.
 3. **Government Sources**: FDA, EPA, court records
 4. **Research Sources**: Academic studies, peer-reviewed papers
@@ -51,10 +51,10 @@ Add these columns to your existing Google Sheets "Reputable_Sources" tab:
 - **Source Types**: Medical, Government, Research, Legal, LIA
 
 ### How Sources Are Selected
-1. **LIA Sources**: System finds all LIA sources, scores them, picks highest scoring
-2. **Regular Sources**: System finds relevant medical/government sources, scores them
+1. **All Sources**: System finds all relevant sources (medical, government, research, legal)
+2. **Scoring**: Each source is scored based on relevance to the user's query
 3. **Deduplication**: System removes any duplicate URLs to ensure unique sources
-4. **Final Selection**: 1 LIA source + 3 best unique regular sources = 4 total sources
+4. **Final Selection**: Top scoring unique sources up to the limit (typically 5 sources)
 
 ## 🧪 Testing
 
@@ -65,10 +65,10 @@ node test-reputable-sources.js
 ```
 
 This will verify that:
-- LIA sources are properly detected
-- At least one LIA source appears in every response
+- Sources are properly detected and scored
+- Relevant sources appear in responses
 - Sources are properly formatted and linked
-- Fallback LIA sources work when Google Sheets is unavailable
+- Fallback sources work when Google Sheets is unavailable
 
 ## 📱 Example Response
 
@@ -86,18 +86,18 @@ Mesothelioma is a serious cancer that affects the lining of the lungs...
 
 ## 🎯 Benefits
 
-1. **Consistent Legal Help**: Users always see legal assistance options
-2. **Balanced Information**: Legal help alongside medical/government sources
-3. **Improved Conversions**: LIA links appear in every response
+1. **Relevant Information**: Users see sources that are directly relevant to their query
+2. **Balanced Information**: Medical, government, and legal sources as appropriate
+3. **Better User Experience**: Sources are contextually appropriate
 4. **Professional Appearance**: Sources are properly formatted and labeled
 5. **Fallback Protection**: System works even when Google Sheets is down
 6. **No Duplicates**: Advanced deduplication ensures no duplicate URLs appear
 
 ## 🔍 Monitoring
 
-The system logs LIA source inclusion:
-- `Found X relevant sources for query (including Y LIA sources)`
-- `LIA source successfully included!`
+The system logs source selection:
+- `Found X relevant sources for query`
+- `Source selection completed successfully!`
 - `Using fallback LIA sources`
 
 ## 🚨 Troubleshooting

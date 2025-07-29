@@ -31,17 +31,8 @@ Contains server-side AI configuration:
 - **Article Context**: Context-aware responses for specific articles
 - **Legal Referral**: Enhanced prompts that include legal referral triggers
 
-### Legal Referral System
-Automatically detects when users ask about legal options and adds a referral to legalinjuryadvocates.com.
-
-**Keywords that trigger legal referral:**
-- consult, speak to, talk to, meet with
-- attorney, lawyer
-- file a claim, legal advice, legal options
-- seek legal, recommend
-- contact a lawyer, contact an attorney
-- how to file, where to file
-- get compensation, payout, settlement
+### No LIA Mentions
+The AI is configured to NOT mention Legal Injury Advocates or any specific law firm in responses. This ensures responses focus on medical and legal information without firm-specific referrals.
 
 ### Enhanced Markdown Support
 The centralized markdown converter supports:
@@ -70,7 +61,6 @@ const response = await chatbot.sendMessage(query, {
     max_tokens: 400
 });
 
-// Legal referral is automatically added if needed
 // Markdown is automatically converted to HTML
 ```
 
@@ -90,7 +80,7 @@ const errorMessage = getServerErrorMessage(error);
 2. **Maintainability**: Changes to AI behavior only need to be made in one place
 3. **Reliability**: Standardized error handling and response formatting
 4. **Scalability**: Easy to add new AI features or modify existing ones
-5. **Legal Compliance**: Consistent legal referral system across all interactions
+5. **Natural Responses**: Organic mentions of Legal Injury Advocates when relevant without forced referrals
 
 ## Files Using AI Configuration
 

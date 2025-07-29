@@ -160,7 +160,7 @@ app.post('/api/chat', async (req, res) => {
       liaCaseInfo = await dataService.checkLIAActiveCase(message);
       
       // Get reputable sources for the query
-      reputableSources = await dataService.getReputableSources(message, 4);
+                  reputableSources = await dataService.getReputableSources(message, 5);
       
       // Smart law firm inclusion - only for legal-related queries (expanded for environmental/toxic exposure cases)
       const isLegalQuery = /\b(lawyer|attorney|legal|firm|representation|claim|lawsuit|compensation|settlement|case|court|litigation|sue|suing|damages|verdict|jury|judge|trial|contaminated|contamination|exposure|exposed|cancer|harm|injury|injured|affected|victims|toxic|poisoning|illness|disease|negligence|liable|liability|wrongful|malpractice|class action|mass tort)\b/i.test(message);
@@ -291,10 +291,7 @@ app.post('/api/chat', async (req, res) => {
           res.write(`data: ${JSON.stringify({ content: sourcesText, type: 'chunk' })}\n\n`, 'utf8');
         }
 
-        if (liaCaseInfo && liaCaseInfo.isActive) {
-          const referralMessage = `\n\n➡️ **Legal Injury Advocates is currently accepting new cases. You can start your claim at** [legalinjuryadvocates.com](https://legalinjuryadvocates.com).`;
-          res.write(`data: ${JSON.stringify({ content: referralMessage, type: 'chunk' })}\n\n`, 'utf8');
-        }
+        // No automatic referral system - responses are referral-free
 
         // Send final metadata
         res.write(`data: ${JSON.stringify({ 
@@ -348,177 +345,9 @@ app.post('/api/chat', async (req, res) => {
     
 
     
-    // Add Legal Injury Advocates referral for active cases
-    if (liaCaseInfo && liaCaseInfo.isActive) {
-      // First, remove any specific referral messages that the AI might have generated
-      // Remove messages with "currently handling" followed by any text
-      responseWithSources = responseWithSources.replace(
-        /➡️\s*Legal Injury Advocates is currently handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      responseWithSources = responseWithSources.replace(
-        /Legal Injury Advocates is currently handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      
-      // Remove any referral messages that mention specific case types
-      responseWithSources = responseWithSources.replace(
-        /➡️\s*Legal Injury Advocates[^.]*(?:forever chemicals|pfas|water contamination)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      responseWithSources = responseWithSources.replace(
-        /Legal Injury Advocates[^.]*(?:forever chemicals|pfas|water contamination)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      
-      // Remove any referral messages that mention "in water" or "water contamination"
-      responseWithSources = responseWithSources.replace(
-        /➡️\s*Legal Injury Advocates[^.]*in water[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      responseWithSources = responseWithSources.replace(
-        /Legal Injury Advocates[^.]*in water[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      
-      // Remove any referral messages that mention "water contamination"
-      responseWithSources = responseWithSources.replace(
-        /➡️\s*Legal Injury Advocates[^.]*water contamination[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      responseWithSources = responseWithSources.replace(
-        /Legal Injury Advocates[^.]*water contamination[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      
-      // Remove any referral messages that mention "forever chemicals"
-      responseWithSources = responseWithSources.replace(
-        /➡️\s*Legal Injury Advocates[^.]*forever chemicals[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      responseWithSources = responseWithSources.replace(
-        /Legal Injury Advocates[^.]*forever chemicals[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      
-      // Now add the generic referral message
-      const referralMessage = `\n\n➡️ **Legal Injury Advocates is currently accepting new cases. You can start your claim at** [legalinjuryadvocates.com](https://legalinjuryadvocates.com).`;
-      responseWithSources += referralMessage;
-    }
+    // No automatic referral system - responses are referral-free
     
-    // Comprehensive cleanup of any old referral messages for ALL responses
-    // Remove any referral messages that mention specific case details
-    responseWithSources = responseWithSources.replace(
-      /➡️\s*Legal Injury Advocates is currently handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
-    responseWithSources = responseWithSources.replace(
-      /Legal Injury Advocates is currently handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
-    
-    // Remove the specific "forever chemicals in water" referral message that the AI is generating
-    responseWithSources = responseWithSources.replace(
-      /➡️\s*Legal Injury Advocates is currently handling forever chemicals in water\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
-    responseWithSources = responseWithSources.replace(
-      /Legal Injury Advocates is currently handling forever chemicals in water\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
-    
-    // Remove any referral messages that mention "forever chemicals in water"
-    responseWithSources = responseWithSources.replace(
-      /➡️\s*Legal Injury Advocates[^.]*forever chemicals in water[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
-    responseWithSources = responseWithSources.replace(
-      /Legal Injury Advocates[^.]*forever chemicals in water[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-      ''
-    );
-    
-    // Remove referral messages only for non-active cases
-    if (!liaCaseInfo || !liaCaseInfo.isActive) {
-      // Remove any referral message that contains "currently handling" followed by specific case details
-      responseWithSources = responseWithSources.replace(
-        /➡️\s*Legal Injury Advocates is currently handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      responseWithSources = responseWithSources.replace(
-        /Legal Injury Advocates is currently handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      
-      // Also remove any referral messages that mention specific case types or lawsuits
-      responseWithSources = responseWithSources.replace(
-        /➡️\s*Legal Injury Advocates[^.]*lawsuits?[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      responseWithSources = responseWithSources.replace(
-        /Legal Injury Advocates[^.]*lawsuits?[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      
-      // Remove any referral messages that mention specific case types (hair straightener, chemical, etc.)
-      responseWithSources = responseWithSources.replace(
-        /➡️\s*Legal Injury Advocates[^.]*(?:hair|chemical|straightener|relaxer)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      responseWithSources = responseWithSources.replace(
-        /Legal Injury Advocates[^.]*(?:hair|chemical|straightener|relaxer)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      
-      // Remove any referral messages that mention specific case types or conditions
-      responseWithSources = responseWithSources.replace(
-        /➡️\s*Legal Injury Advocates[^.]*(?:mesothelioma|asbestos|talcum|powder|roundup|glyphosate|pfas|paraquat)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      responseWithSources = responseWithSources.replace(
-        /Legal Injury Advocates[^.]*(?:mesothelioma|asbestos|talcum|powder|roundup|glyphosate|pfas|paraquat)[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      
-      // Remove any referral messages that mention "affected by" or "been affected by"
-      responseWithSources = responseWithSources.replace(
-        /➡️\s*If you or a loved one has been affected by[^.]*\.\s*Legal Injury Advocates[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      responseWithSources = responseWithSources.replace(
-        /If you or a loved one has been affected by[^.]*\.\s*Legal Injury Advocates[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      
-      // Remove any referral messages that mention "actively handling" or "currently handling"
-      responseWithSources = responseWithSources.replace(
-        /➡️\s*Legal Injury Advocates is (?:actively|currently) handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      responseWithSources = responseWithSources.replace(
-        /Legal Injury Advocates is (?:actively|currently) handling[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      
-      // Remove any referral messages that mention "forever chemicals" (catch all variations)
-      responseWithSources = responseWithSources.replace(
-        /➡️\s*Legal Injury Advocates[^.]*forever chemicals[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      responseWithSources = responseWithSources.replace(
-        /Legal Injury Advocates[^.]*forever chemicals[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      
-      // Remove any referral messages that mention "water" (catch all water-related cases)
-      responseWithSources = responseWithSources.replace(
-        /➡️\s*Legal Injury Advocates[^.]*water[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-      responseWithSources = responseWithSources.replace(
-        /Legal Injury Advocates[^.]*water[^.]*\.\s*You can start your claim at legalinjuryadvocates\.com\./gi,
-        ''
-      );
-    }
+    // No automatic referral system - responses are referral-free
     
 
     

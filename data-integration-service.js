@@ -1450,7 +1450,7 @@ export class DataIntegrationService {
     /**
      * Get reputable sources for a query
      */
-    async getReputableSources(query, limit = 4) {
+    async getReputableSources(query, limit = 5) {
         if (!this.reputableSources) {
             console.log('⚠️ Reputable sources service not available');
             return [];

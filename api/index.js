@@ -54,7 +54,7 @@ app.post('/api/chat', async (req, res) => {
       liaCaseInfo = await dataService.checkLIAActiveCase(message);
       
       // Get reputable sources for the query
-      reputableSources = await dataService.getReputableSources(message, 4);
+                  reputableSources = await dataService.getReputableSources(message, 5);
       
       // Smart law firm inclusion - only for legal-related queries (expanded for environmental/toxic exposure cases)
       const isLegalQuery = /\b(lawyer|attorney|legal|firm|representation|claim|lawsuit|compensation|settlement|case|court|litigation|sue|suing|damages|verdict|jury|judge|trial|contaminated|contamination|exposure|exposed|cancer|harm|injury|injured|affected|victims|toxic|poisoning|illness|disease|negligence|liable|liability|wrongful|malpractice|class action|mass tort)\b/i.test(message);
@@ -179,10 +179,7 @@ app.post('/api/chat', async (req, res) => {
           res.write(`data: ${JSON.stringify({ content: sourcesText, type: 'chunk' })}\n\n`, 'utf8');
         }
 
-        if (liaCaseInfo && liaCaseInfo.isActive) {
-          const referralMessage = `\n\n➡️ **Legal Injury Advocates is currently accepting new cases. You can start your claim at** [legalinjuryadvocates.com](https://legalinjuryadvocates.com).`;
-          res.write(`data: ${JSON.stringify({ content: referralMessage, type: 'chunk' })}\n\n`, 'utf8');
-        }
+        // No automatic referral system - responses are referral-free
 
         // Send final metadata
         res.write(`data: ${JSON.stringify({ 
@@ -225,11 +222,7 @@ app.post('/api/chat', async (req, res) => {
       response += sourcesText;
     }
 
-    // Add Legal Injury Advocates referral for active cases
-    if (liaCaseInfo && liaCaseInfo.isActive) {
-      const referralMessage = `\n\n➡️ **Legal Injury Advocates is currently accepting new cases. You can start your claim at** [legalinjuryadvocates.com](https://legalinjuryadvocates.com).`;
-      response += referralMessage;
-    }
+    // No automatic referral system - responses are referral-free
 
     res.set('Content-Type', 'application/json; charset=utf-8');
     res.json({ 

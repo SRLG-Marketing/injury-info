@@ -65,9 +65,9 @@ export class ReputableSourcesService {
     }
 
     /**
-     * Find relevant sources for a user query - Enhanced to always include LIA source
+     * Find relevant sources for a user query - Only includes relevant sources
      */
-    async findRelevantSources(query, limit = 4) {
+    async findRelevantSources(query, limit = 5) {
         if (!query || typeof query !== 'string') {
             return [];
         }
@@ -76,65 +76,37 @@ export class ReputableSourcesService {
             const allSources = await this.getAllReputableSources();
             const queryWords = this.extractQueryWords(query);
             
-            // Separate LIA sources from regular sources
-            const liaSources = allSources.filter(source => this.isLIASource(source));
-            const regularSources = allSources.filter(source => !this.isLIASource(source));
-            
             // Early filtering for better performance with large datasets
-            const preFilteredRegularSources = this.preFilterSources(regularSources, queryWords, query);
+            const preFilteredSources = this.preFilterSources(allSources, queryWords, query);
             
-            // Score regular sources
-            const scoredRegularSources = preFilteredRegularSources.map(source => ({
+            // Score all sources
+            const scoredSources = preFilteredSources.map(source => ({
                 ...source,
                 score: this.calculateRelevanceScore(source, queryWords, query)
             }));
 
-            // Score LIA sources
-            const scoredLIASources = liaSources.map(source => ({
-                ...source,
-                score: this.calculateRelevanceScore(source, queryWords, query)
-            }));
-
-            // Sort both arrays by score
-            scoredRegularSources.sort((a, b) => {
+            // Sort all sources by score
+            scoredSources.sort((a, b) => {
                 if (b.score !== a.score) {
                     return b.score - a.score;
                 }
                 return a.priority - b.priority;
             });
-
-            scoredLIASources.sort((a, b) => {
+            
+            // Sort all sources by score
+            scoredSources.sort((a, b) => {
                 if (b.score !== a.score) {
                     return b.score - a.score;
                 }
                 return a.priority - b.priority;
             });
-
-            // Always include at least one LIA source (the highest scoring one)
-            let selectedLIASource = scoredLIASources.length > 0 ? [scoredLIASources[0]] : this.getFallbackLIASources();
             
-            // Deduplicate LIA sources by URL (in case there are multiple LIA sources with same URL)
-            const liaUrls = new Set();
-            selectedLIASource = selectedLIASource.filter(source => {
-                if (liaUrls.has(source.sourceUrl)) {
-                    console.log(`🔄 Skipping duplicate LIA URL: ${source.sourceUrl}`);
-                    return false;
-                }
-                liaUrls.add(source.sourceUrl);
-                return true;
-            });
+            // Select top sources up to the limit, avoiding duplicates
+            const finalSources = [];
+            const usedUrls = new Set();
             
-            // Start with the guaranteed LIA source(s)
-            const finalSources = [...selectedLIASource];
-            const usedUrls = new Set(selectedLIASource.map(source => source.sourceUrl));
-            
-            // Calculate remaining slots for regular sources
-            const remainingSlots = Math.max(0, limit - selectedLIASource.length);
-            
-            // Add regular sources, but skip duplicates
-            const selectedRegularSources = [];
-            for (const source of scoredRegularSources) {
-                if (selectedRegularSources.length >= remainingSlots) break;
+            for (const source of scoredSources) {
+                if (finalSources.length >= limit) break;
                 
                 // Skip if we already have this URL
                 if (usedUrls.has(source.sourceUrl)) {
@@ -142,61 +114,22 @@ export class ReputableSourcesService {
                     continue;
                 }
                 
-                selectedRegularSources.push(source);
+                finalSources.push(source);
                 usedUrls.add(source.sourceUrl);
             }
-            
-            // Add the non-duplicate regular sources to final results
-            finalSources.push(...selectedRegularSources);
 
-            console.log(`🔍 Found ${finalSources.length} relevant sources for query: "${query}" (including ${selectedLIASource.length} LIA sources, ${selectedRegularSources.length} unique regular sources)`);
+            console.log(`🔍 Found ${finalSources.length} relevant sources for query: "${query}"`);
             
             return finalSources;
 
         } catch (error) {
             console.error('❌ Error finding relevant sources:', error);
-            // Return at least fallback LIA sources on error
-            return this.getFallbackLIASources();
+            // Return fallback sources on error
+            return this.getFallbackSources();
         }
     }
 
-    /**
-     * Check if a source is a Legal Injury Advocates source
-     */
-    isLIASource(source) {
-        if (!source) return false;
-        
-        const sourceTitle = source.sourceTitle?.toLowerCase() || '';
-        const sourceUrl = source.sourceUrl?.toLowerCase() || '';
-        const sourceType = source.sourceType?.toLowerCase() || '';
-        
-        return sourceTitle.includes('legal injury advocates') || 
-               sourceTitle.includes('legalinjuryadvocates') ||
-               sourceUrl.includes('legalinjuryadvocates.com') ||
-               sourceType === 'lia' ||
-               sourceType === 'legal injury advocates';
-    }
 
-    /**
-     * Get fallback Legal Injury Advocates sources
-     */
-    getFallbackLIASources() {
-        return [
-            {
-                id: 'lia_fallback_1',
-                diseaseAilment: 'Legal Assistance',
-                sourceTitle: 'Legal Injury Advocates - Free Case Evaluation',
-                sourceUrl: 'https://legalinjuryadvocates.com',
-                sourceType: 'LIA',
-                priority: 1,
-                keywords: 'legal help, injury claims, compensation, lawsuit, legal advice, case evaluation',
-                description: 'Free case evaluation and legal assistance for injury claims',
-                lastUpdated: new Date().toISOString().split('T')[0],
-                active: true,
-                source: 'fallback'
-            }
-        ];
-    }
 
     /**
      * Find sources for a specific disease/ailment
