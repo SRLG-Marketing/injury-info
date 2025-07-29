@@ -65,7 +65,11 @@ export class ReputableSourcesService {
     }
 
     /**
-     * Find relevant sources for a user query - Only includes relevant sources
+     * Find relevant sources for a user query with priority-based selection
+     * Priority rules:
+     * - First two links: priority 1 or 2
+     * - Next two links (3rd and 4th): priority 3, 4, or 5
+     * - Fifth link: priority 5
      */
     async findRelevantSources(query, limit = 5) {
         if (!query || typeof query !== 'string') {
@@ -85,7 +89,7 @@ export class ReputableSourcesService {
                 score: this.calculateRelevanceScore(source, queryWords, query)
             }));
 
-            // Sort all sources by score
+            // Sort all sources by score first, then by priority
             scoredSources.sort((a, b) => {
                 if (b.score !== a.score) {
                     return b.score - a.score;
@@ -93,32 +97,70 @@ export class ReputableSourcesService {
                 return a.priority - b.priority;
             });
             
-            // Sort all sources by score
-            scoredSources.sort((a, b) => {
-                if (b.score !== a.score) {
-                    return b.score - a.score;
-                }
-                return a.priority - b.priority;
-            });
-            
-            // Select top sources up to the limit, avoiding duplicates
+            // Priority-based selection
             const finalSources = [];
             const usedUrls = new Set();
             
-            for (const source of scoredSources) {
-                if (finalSources.length >= limit) break;
-                
-                // Skip if we already have this URL
-                if (usedUrls.has(source.sourceUrl)) {
-                    console.log(`🔄 Skipping duplicate URL: ${source.sourceUrl}`);
-                    continue;
+            // Helper function to find next source with specific priority range
+            const findNextSourceWithPriority = (priorityRange, excludeUrls) => {
+                for (const source of scoredSources) {
+                    if (excludeUrls.has(source.sourceUrl)) continue;
+                    if (priorityRange.includes(source.priority)) {
+                        return source;
+                    }
                 }
-                
-                finalSources.push(source);
-                usedUrls.add(source.sourceUrl);
+                return null;
+            };
+            
+            // Helper function to find next source with any priority
+            const findNextSource = (excludeUrls) => {
+                for (const source of scoredSources) {
+                    if (!excludeUrls.has(source.sourceUrl)) {
+                        return source;
+                    }
+                }
+                return null;
+            };
+            
+            // Select first two sources with priority 1 or 2
+            for (let i = 0; i < 2 && finalSources.length < limit; i++) {
+                const source = findNextSourceWithPriority([1, 2], usedUrls);
+                if (source) {
+                    finalSources.push(source);
+                    usedUrls.add(source.sourceUrl);
+                }
+            }
+            
+            // Select next two sources (3rd and 4th) with priority 3, 4, or 5
+            for (let i = 0; i < 2 && finalSources.length < limit; i++) {
+                const source = findNextSourceWithPriority([3, 4, 5], usedUrls);
+                if (source) {
+                    finalSources.push(source);
+                    usedUrls.add(source.sourceUrl);
+                }
+            }
+            
+            // Select fifth source with priority 5
+            if (finalSources.length < limit) {
+                const source = findNextSourceWithPriority([5], usedUrls);
+                if (source) {
+                    finalSources.push(source);
+                    usedUrls.add(source.sourceUrl);
+                }
+            }
+            
+            // If we still have slots to fill, add any remaining sources
+            while (finalSources.length < limit) {
+                const source = findNextSource(usedUrls);
+                if (source) {
+                    finalSources.push(source);
+                    usedUrls.add(source.sourceUrl);
+                } else {
+                    break; // No more sources available
+                }
             }
 
-            console.log(`🔍 Found ${finalSources.length} relevant sources for query: "${query}"`);
+            console.log(`🔍 Found ${finalSources.length} relevant sources for query: "${query}" with priority-based selection`);
             
             return finalSources;
 
