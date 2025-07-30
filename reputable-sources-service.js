@@ -24,6 +24,8 @@ export class ReputableSourcesService {
 
     /**
      * Get all reputable sources from Google Sheets
+     * Includes LIA sources (Legal Injury Advocates) which are automatically
+     * included in search results when queries relate to LIA active cases
      */
     async getAllReputableSources() {
         const cacheKey = 'all_reputable_sources';
@@ -297,6 +299,9 @@ export class ReputableSourcesService {
 
     /**
      * Map Google Sheets row to source object
+     * Handles LIA sources (Legal Injury Advocates) with source types:
+     * - "LIA": General Legal Injury Advocates sources
+     * - "LIA Blog Post": Specific blog articles from Legal Injury Advocates
      */
     mapSheetRowToSource(row) {
         try {
@@ -359,8 +364,8 @@ export class ReputableSourcesService {
                 diseaseAilment: 'Legal Assistance',
                 sourceTitle: 'Legal Injury Advocates - Free Case Evaluation',
                 sourceUrl: 'https://legalinjuryadvocates.com',
-                sourceType: 'LIA',
-                priority: 1,
+                sourceType: 'Legal Injury Advocates',
+                priority: 3,
                 keywords: 'legal help, injury claims, compensation, lawsuit, legal advice, case evaluation',
                 description: 'Free case evaluation and legal assistance for injury claims',
                 lastUpdated: new Date().toISOString().split('T')[0],

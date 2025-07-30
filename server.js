@@ -9,6 +9,9 @@ import { AI_CONFIG } from './ai-config.js';
 import { DataIntegrationService } from './data-integration-service.js';
 import { DataVerificationMiddleware } from './data-verification-middleware.js';
 import { getBaseUrl, getApiBaseUrl } from './utils/url-helper.js';
+import { QueryTracker } from './utils/query-tracker.js';
+import { HubSpotInjuryInfoConnector } from './hubspot-connector.js';
+import queryAnalyticsRouter from './api/query-analytics.js';
 
 import { getCorsOrigins } from './config/server-urls.js';
 
@@ -31,6 +34,18 @@ const dataService = new DataIntegrationService();
 
 // Initialize Data Verification Middleware
 const verificationMiddleware = new DataVerificationMiddleware();
+
+// Initialize HubSpot Connector
+const hubspotConnector = new HubSpotInjuryInfoConnector();
+
+// Initialize Query Tracker with HubSpot integration
+const queryTracker = new QueryTracker({
+    hubspotConnector,
+    enableHubSpotTracking: process.env.ENABLE_HUBSPOT_TRACKING !== 'false',
+    enableFileLogging: process.env.ENABLE_FILE_LOGGING !== 'false',
+    batchSize: parseInt(process.env.QUERY_BATCH_SIZE) || 10,
+    batchTimeout: parseInt(process.env.QUERY_BATCH_TIMEOUT) || 60000
+});
 
 // Middleware
 app.use(cors({
@@ -115,8 +130,12 @@ if (process.env.NODE_ENV !== 'production') {
   app.use(express.static(path.join(__dirname, 'public')));
 }
 
+// Mount analytics API routes
+app.use('/api/analytics', queryAnalyticsRouter);
+
 // API endpoint for OpenAI chat
 app.post('/api/chat', async (req, res) => {
+  const startTime = Date.now();
   try {
     const { message, systemMessage, options = {} } = req.body;
 
@@ -134,7 +153,7 @@ app.post('/api/chat', async (req, res) => {
       apiBaseUrl
     });
 
-    // Track user query for analytics (non-blocking)
+    // Prepare tracking context for enhanced analytics
     const trackingContext = {
       userAgent: req.get('User-Agent'),
       ipAddress: req.ip || req.connection.remoteAddress,
@@ -142,11 +161,6 @@ app.post('/api/chat', async (req, res) => {
       pageUrl: req.get('Referer') || '',
       referrer: req.get('Referer') || ''
     };
-    
-    // Track query asynchronously (don't wait for it)
-    dataService.trackUserQuery(message, trackingContext).catch(error => {
-      console.warn('Could not track user query:', error.message);
-    });
 
     // Get relevant data for context
     let contextData = [];
@@ -351,6 +365,26 @@ app.post('/api/chat', async (req, res) => {
     
 
     
+    // Calculate response time
+    const responseTime = Date.now() - startTime;
+    
+    // Enhanced tracking with response data
+    queryTracker.trackQuery({
+      query: message,
+      source: 'chatbot',
+      responseTime,
+      sourcesFound: reputableSources.length,
+      articlesFound: contextData.filter(item => item.type === 'article').length,
+      lawFirmsFound: contextData.filter(item => item.type === 'law_firm').length,
+      settlementsFound: contextData.filter(item => item.type === 'settlement').length,
+      isLegalQuery: /\b(lawyer|attorney|legal|firm|representation|claim|lawsuit|compensation|settlement|case|court|litigation|sue|suing|damages|verdict|jury|judge|trial|contaminated|contamination|exposure|exposed|cancer|harm|injury|injured|affected|victims|toxic|poisoning|illness|disease|negligence|liable|liability|wrongful|malpractice|class action|mass tort)\b/i.test(message),
+      liaCaseType: liaCaseInfo?.caseType || null,
+      liaCaseInfo: liaCaseInfo || null,
+      ...trackingContext
+    }).catch(error => {
+      console.warn('Could not track enhanced query data:', error.message);
+    });
+
     res.set('Content-Type', 'application/json; charset=utf-8');
     res.json({ 
       response: responseWithSources,

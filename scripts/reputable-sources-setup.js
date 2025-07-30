@@ -32,6 +32,17 @@ const REPUTABLE_SOURCES_STRUCTURE = {
             'Description': 'Example description of what this source covers',
             'Last_Updated': '2024-01-15',
             'Active': 'TRUE'
+        },
+        {
+            'Disease_Ailment': 'Mesothelioma',
+            'Source_Title': 'Legal Injury Advocates - Mesothelioma Cases',
+            'Source_URL': 'https://legalinjuryadvocates.com/mesothelioma',
+            'Source_Type': 'LIA',
+            'Priority': 1,
+            'Keywords': 'mesothelioma, asbestos, legal help, compensation',
+            'Description': 'Legal assistance for mesothelioma cases',
+            'Last_Updated': '2024-01-15',
+            'Active': 'TRUE'
         }
     ]
 };
@@ -71,6 +82,8 @@ function createReputableSourcesTemplate() {
     console.log('- Research: Academic studies, peer-reviewed papers');
     console.log('- Legal: Court decisions, legal databases');
     console.log('- News: Reputable news sources (use sparingly)');
+    console.log('- LIA: Legal Injury Advocates sources');
+    console.log('- LIA Blog Post: Legal Injury Advocates blog posts');
     
     return REPUTABLE_SOURCES_STRUCTURE;
 }
@@ -100,7 +113,7 @@ function validateReputableSource(source) {
     }
     
     // Validate source type
-    const validTypes = ['Medical', 'Government', 'Research', 'Legal', 'News'];
+    const validTypes = ['Medical', 'Government', 'Research', 'Legal', 'News', 'LIA', 'LIA Blog Post'];
     if (source.Source_Type && !validTypes.includes(source.Source_Type)) {
         errors.push(`Source_Type must be one of: ${validTypes.join(', ')}`);
     }
@@ -165,6 +178,8 @@ ${REPUTABLE_SOURCES_STRUCTURE.columns.map((col, i) => `${i + 1}. ${col}`).join('
 - Research: Academic studies, peer-reviewed papers
 - Legal: Court decisions, legal databases
 - News: Reputable news sources (use sparingly)
+- LIA: Legal Injury Advocates sources
+- LIA Blog Post: Legal Injury Advocates blog posts
 
 ### Priority (1-5)
 - 1 = Highest priority (most authoritative)
@@ -202,6 +217,13 @@ ${REPUTABLE_SOURCES_STRUCTURE.columns.map((col, i) => `${i + 1}. ${col}`).join('
 - Prefer recent sources when possible
 - Include diverse perspectives when appropriate
 
+### LIA Sources
+- Use "LIA" for general Legal Injury Advocates sources
+- Use "LIA Blog Post" for specific blog articles from Legal Injury Advocates
+- Ensure LIA sources have relevant keywords for case types
+- Set appropriate priorities (usually 1-2 for LIA sources)
+- Include disease-specific LIA sources for better targeting
+
 ### Keyword Strategy
 - Include both medical terms and common language
 - Add synonyms and alternative spellings
@@ -220,10 +242,17 @@ ${REPUTABLE_SOURCES_STRUCTURE.columns.map((col, i) => `${i + 1}. ${col}`).join('
 - Add new sources as they become available
 - Review and adjust priorities as needed
 
-## 5. Example Entry
+## 5. Example Entries
+
+### Medical Source Example
 | Disease_Ailment | Source_Title | Source_URL | Source_Type | Priority | Keywords | Description | Last_Updated | Active |
 |-----------------|--------------|------------|-------------|----------|----------|-------------|--------------|--------|
 | Mesothelioma | Mesothelioma - Mayo Clinic | https://www.mayoclinic.org/diseases-conditions/mesothelioma/symptoms-causes/syc-20375022 | Medical | 1 | mesothelioma, asbestos cancer, pleural mesothelioma | Comprehensive medical information about mesothelioma | 2024-01-15 | TRUE |
+
+### LIA Source Example
+| Disease_Ailment | Source_Title | Source_URL | Source_Type | Priority | Keywords | Description | Last_Updated | Active |
+|-----------------|--------------|------------|-------------|----------|----------|-------------|--------------|--------|
+| Mesothelioma | Legal Injury Advocates - Mesothelioma Cases | https://legalinjuryadvocates.com/mesothelioma | LIA | 1 | mesothelioma, asbestos, legal help, compensation | Legal assistance for mesothelioma cases | 2024-01-15 | TRUE |
 
 ## 6. Testing
 After setting up your sheet:

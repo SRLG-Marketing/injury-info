@@ -1299,22 +1299,11 @@ export class DataIntegrationService {
         return {
             activeCases: [
                 {
-                    caseType: 'talcum-powder',
-                    name: 'Talcum Powder',
-                    description: 'Talcum powder and ovarian cancer cases',
-                    keywords: ['talcum powder', 'talc', 'baby powder', 'ovarian cancer', 'johnson & johnson'],
-                    active: true,
-                    lastUpdated: new Date().toISOString(),
-                    source: 'fallback'
-                }
-            ],
-            allCases: [
-                {
                     caseType: 'mesothelioma',
                     name: 'Mesothelioma',
                     description: 'Mesothelioma and asbestos exposure cases',
                     keywords: ['mesothelioma', 'asbestos', 'asbestos exposure', 'lung cancer', 'pleural mesothelioma'],
-                    active: false,
+                    active: true,
                     lastUpdated: new Date().toISOString(),
                     source: 'fallback'
                 },
@@ -1332,7 +1321,72 @@ export class DataIntegrationService {
                     name: 'Roundup',
                     description: 'Roundup weedkiller and cancer cases',
                     keywords: ['roundup', 'glyphosate', 'weedkiller', 'non-hodgkin lymphoma', 'bayer', 'monsanto'],
-                    active: false,
+                    active: true,
+                    lastUpdated: new Date().toISOString(),
+                    source: 'fallback'
+                },
+                {
+                    caseType: 'pfas',
+                    name: 'PFAS Exposure',
+                    description: 'PFAS exposure and water contamination cases',
+                    keywords: ['pfas', 'forever chemicals', 'water contamination', 'environmental exposure'],
+                    active: true,
+                    lastUpdated: new Date().toISOString(),
+                    source: 'fallback'
+                },
+                {
+                    caseType: 'paraquat',
+                    name: 'Paraquat',
+                    description: 'Paraquat herbicide and Parkinson\'s disease cases',
+                    keywords: ['paraquat', 'herbicide', 'parkinson', 'parkinsons disease'],
+                    active: true,
+                    lastUpdated: new Date().toISOString(),
+                    source: 'fallback'
+                }
+            ],
+            allCases: [
+                {
+                    caseType: 'mesothelioma',
+                    name: 'Mesothelioma',
+                    description: 'Mesothelioma and asbestos exposure cases',
+                    keywords: ['mesothelioma', 'asbestos', 'asbestos exposure', 'lung cancer', 'pleural mesothelioma'],
+                    active: true,
+                    lastUpdated: new Date().toISOString(),
+                    source: 'fallback'
+                },
+                {
+                    caseType: 'talcum-powder',
+                    name: 'Talcum Powder',
+                    description: 'Talcum powder and ovarian cancer cases',
+                    keywords: ['talcum powder', 'talc', 'baby powder', 'ovarian cancer', 'johnson & johnson'],
+                    active: true,
+                    lastUpdated: new Date().toISOString(),
+                    source: 'fallback'
+                },
+                {
+                    caseType: 'roundup',
+                    name: 'Roundup',
+                    description: 'Roundup weedkiller and cancer cases',
+                    keywords: ['roundup', 'glyphosate', 'weedkiller', 'non-hodgkin lymphoma', 'bayer', 'monsanto'],
+                    active: true,
+                    lastUpdated: new Date().toISOString(),
+                    source: 'fallback'
+                },
+                {
+                    caseType: 'pfas',
+                    name: 'PFAS Exposure',
+                    description: 'PFAS exposure and water contamination cases',
+                    keywords: ['pfas', 'forever chemicals', 'water contamination', 'environmental exposure'],
+                    active: true,
+                    lastUpdated: new Date().toISOString(),
+                    source: 'fallback'
+                },
+                {
+                    caseType: 'paraquat',
+                    name: 'Paraquat',
+                    description: 'Paraquat herbicide and Parkinson\'s disease cases',
+                    keywords: ['paraquat', 'herbicide', 'parkinson', 'parkinsons disease'],
+                    active: true,
                     lastUpdated: new Date().toISOString(),
                     source: 'fallback'
                 },
@@ -1346,8 +1400,8 @@ export class DataIntegrationService {
                     source: 'fallback'
                 }
             ],
-            totalActive: 1,
-            totalCases: 4,
+            totalActive: 5,
+            totalCases: 6,
             lastUpdated: new Date().toISOString(),
             source: 'fallback'
         };
@@ -1448,7 +1502,7 @@ export class DataIntegrationService {
     }
 
     /**
-     * Get reputable sources for a query
+     * Get reputable sources for a query, ensuring LIA sources are included for relevant cases
      */
     async getReputableSources(query, limit = 5) {
         if (!this.reputableSources) {
@@ -1457,11 +1511,111 @@ export class DataIntegrationService {
         }
 
         try {
-            return await this.reputableSources.findRelevantSources(query, limit);
+            // First check if this query relates to an LIA active case
+            const liaCaseInfo = await this.checkLIAActiveCase(query);
+            
+            // Get all reputable sources
+            const allSources = await this.reputableSources.getAllReputableSources();
+            
+            // Find relevant sources for the query
+            const relevantSources = await this.reputableSources.findRelevantSources(query, limit);
+            
+            // Always ensure an LIA source is included from Google Sheets
+            console.log(`🎯 Ensuring LIA source is included for query: "${query}"`);
+            
+            // Look for Legal Injury Advocates sources (only specific Source_Type values)
+            const liaSources = allSources.filter(source => 
+                source.active && (
+                    source.sourceType === 'LIA Blog Post' ||
+                    source.sourceType === 'Legal Injury Advocates'
+                )
+            );
+            
+            // If we have LIA sources, ensure one is included
+            if (liaSources.length > 0) {
+                // Find the most relevant LIA source for this case (or first available if no specific case)
+                const relevantLiaSource = liaCaseInfo && liaCaseInfo.isActive ? 
+                    this.findMostRelevantLIASource(liaSources, liaCaseInfo, query) :
+                    liaSources[0]; // Use first available LIA source if no specific case detected
+                
+                // Check if an LIA source is already in the relevant sources
+                const hasLiaSource = relevantSources.some(source => 
+                    source.sourceType === 'LIA Blog Post' ||
+                    source.sourceType === 'Legal Injury Advocates'
+                );
+                
+                if (!hasLiaSource && relevantLiaSource) {
+                    // Remove any existing LIA sources to avoid duplicates
+                    const nonLiaSources = relevantSources.filter(source => 
+                        !(source.sourceType === 'LIA Blog Post' ||
+                          source.sourceType === 'Legal Injury Advocates')
+                    );
+                    
+                    // Place LIA source in position 3, 4, or 5 (prefer position 3)
+                    const liaPosition = Math.min(3, nonLiaSources.length + 1);
+                    
+                    // Insert the LIA source at the specified position
+                    nonLiaSources.splice(liaPosition - 1, 0, relevantLiaSource);
+                    
+                    // Take only the first 'limit' sources
+                    relevantSources.length = 0;
+                    relevantSources.push(...nonLiaSources.slice(0, limit));
+                    
+                    console.log(`✅ Added LIA source at position ${liaPosition}: ${relevantLiaSource.sourceTitle}`);
+                }
+            }
+            
+            return relevantSources.slice(0, limit);
         } catch (error) {
             console.error('❌ Error getting reputable sources:', error);
             return [];
         }
+    }
+
+    /**
+     * Find the most relevant LIA source for a specific case
+     */
+    findMostRelevantLIASource(liaSources, liaCaseInfo, query) {
+        // First, try to find a source that matches the specific case type
+        const caseSpecificSource = liaSources.find(source => {
+            const sourceKeywords = this.parseKeywords(source.keywords || '');
+            const caseKeywords = liaCaseInfo.keywords || [];
+            
+            // Check if any case keywords match source keywords
+            return caseKeywords.some(caseKeyword => 
+                sourceKeywords.some(sourceKeyword => 
+                    sourceKeyword.toLowerCase().includes(caseKeyword.toLowerCase()) ||
+                    caseKeyword.toLowerCase().includes(sourceKeyword.toLowerCase())
+                )
+            );
+        });
+        
+        if (caseSpecificSource) {
+            return caseSpecificSource;
+        }
+        
+        // If no case-specific source, look for general LIA sources
+        const generalLiaSource = liaSources.find(source => 
+            source.diseaseAilment === 'Legal Assistance' || 
+            source.diseaseAilment === 'General' ||
+            source.sourceTitle.toLowerCase().includes('free case evaluation') ||
+            source.sourceTitle.toLowerCase().includes('case evaluation')
+        );
+        
+        if (generalLiaSource) {
+            return generalLiaSource;
+        }
+        
+        // Return the first available LIA source
+        return liaSources[0];
+    }
+
+    /**
+     * Parse keywords string into array
+     */
+    parseKeywords(keywordsString) {
+        if (!keywordsString) return [];
+        return keywordsString.split(',').map(k => k.trim()).filter(k => k.length > 0);
     }
 
     /**
