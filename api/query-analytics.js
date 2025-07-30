@@ -322,6 +322,83 @@ router.post('/cleanup', authMiddleware.requireAuth(), async (req, res) => {
 });
 
 /**
+ * POST /api/analytics/track-conversion
+ * Track conversion when user visits Legal Injury Advocates page
+ */
+router.post('/track-conversion', authMiddleware.requireAuth(), async (req, res) => {
+    try {
+        const { queryId, pageUrl, conversionType, referralGenerated, userAgent, sessionId } = req.body;
+        
+        if (!queryId || !pageUrl) {
+            return res.status(400).json({
+                success: false,
+                error: 'queryId and pageUrl are required'
+            });
+        }
+        
+        const conversionData = {
+            pageUrl,
+            conversionType: conversionType || 'page_visit',
+            referralGenerated: referralGenerated || false,
+            userAgent: userAgent || req.get('User-Agent'),
+            sessionId: sessionId || req.session?.id || 'unknown'
+        };
+        
+        const result = await queryTracker.trackConversion(queryId, conversionData);
+        
+        if (result.success) {
+            res.json({
+                success: true,
+                conversionId: result.conversionId,
+                message: 'Conversion tracked successfully',
+                timestamp: new Date().toISOString()
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                error: 'Failed to track conversion',
+                details: result.error
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Error tracking conversion:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to track conversion',
+            details: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/analytics/conversions
+ * Get conversion statistics
+ */
+router.get('/conversions', authMiddleware.requireAuth(), async (req, res) => {
+    try {
+        const days = parseInt(req.query.days) || 30;
+        
+        const conversionStats = await queryTracker.getConversionStats(days);
+        
+        res.json({
+            success: true,
+            conversions: conversionStats,
+            days,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ Error getting conversion stats:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get conversion statistics',
+            details: error.message
+        });
+    }
+});
+
+/**
  * GET /api/analytics/hubspot-status
  * Check HubSpot integration status
  */

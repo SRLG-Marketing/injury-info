@@ -69,6 +69,42 @@ export class QueryLogger {
     }
 
     /**
+     * Log a conversion event
+     */
+    async logConversion(conversionData) {
+        if (this.isServerless) {
+            console.log('📝 Conversion logging skipped in serverless environment');
+            return { success: true, serverless: true };
+        }
+
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const conversionFile = path.join(this.logsDir, `conversions-${today}.json`);
+            
+            let conversions = [];
+            
+            try {
+                const existingData = await fs.readFile(conversionFile, 'utf8');
+                conversions = JSON.parse(existingData);
+            } catch (error) {
+                // File doesn't exist yet, start with empty array
+                conversions = [];
+            }
+            
+            conversions.push(conversionData);
+            
+            await fs.writeFile(conversionFile, JSON.stringify(conversions, null, 2));
+            console.log(`🎯 Conversion logged to ${conversionFile}`);
+            
+            return { success: true };
+            
+        } catch (error) {
+            console.error('❌ Error logging conversion:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
      * Log a user query
      */
     async logQuery(queryData) {

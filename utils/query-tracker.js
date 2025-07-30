@@ -99,7 +99,12 @@ export class QueryTracker {
             os: this.detectOS(queryData.userAgent || ''),
             source: queryData.source || 'chatbot',
             environment: process.env.NODE_ENV || 'development',
-            version: process.env.APP_VERSION || '1.0.0'
+            version: process.env.APP_VERSION || '1.0.0',
+            // Legal Injury Advocates conversion tracking
+            liaConversion: queryData.liaConversion || null,
+            liaPageVisited: queryData.liaPageVisited || null,
+            liaReferralGenerated: queryData.liaReferralGenerated || false,
+            conversionTimestamp: queryData.conversionTimestamp || null
         };
     }
 
@@ -405,6 +410,94 @@ export class QueryTracker {
             inMemoryCount: inMemoryQueries.length,
             fileCount: fileAnalytics.totalQueries
         };
+    }
+
+    /**
+     * Track conversion when user visits Legal Injury Advocates page
+     */
+    async trackConversion(queryId, conversionData) {
+        try {
+            const conversionInfo = {
+                queryId,
+                conversionTimestamp: new Date().toISOString(),
+                liaPageVisited: conversionData.pageUrl || '',
+                liaConversion: conversionData.conversionType || 'page_visit',
+                liaReferralGenerated: conversionData.referralGenerated || false,
+                userAgent: conversionData.userAgent || '',
+                sessionId: conversionData.sessionId || ''
+            };
+
+            // Log conversion to file if enabled
+            if (this.enableFileLogging) {
+                await this.queryLogger.logConversion(conversionInfo);
+            }
+
+            // Add to HubSpot if enabled
+            if (this.enableHubSpotTracking && this.hubspotConnector) {
+                try {
+                    await this.hubspotConnector.logConversion(conversionInfo);
+                } catch (error) {
+                    console.warn('Could not log conversion to HubSpot:', error.message);
+                }
+            }
+
+            console.log(`🎯 Conversion tracked: Query ${queryId} → ${conversionInfo.liaPageVisited}`);
+            return { success: true, conversionId: `conv_${Date.now()}` };
+
+        } catch (error) {
+            console.error('❌ Error tracking conversion:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Get conversion statistics
+     */
+    async getConversionStats(days = 30) {
+        try {
+            const analytics = await this.getAnalytics(days);
+            const queries = analytics.recentQueries || [];
+
+            // Count conversions
+            const conversions = queries.filter(q => q.liaConversion || q.liaPageVisited);
+            const totalQueries = queries.length;
+            const conversionRate = totalQueries > 0 ? (conversions.length / totalQueries * 100).toFixed(2) : 0;
+
+            // Group by conversion type
+            const conversionTypes = {};
+            conversions.forEach(conversion => {
+                const type = conversion.liaConversion || 'page_visit';
+                conversionTypes[type] = (conversionTypes[type] || 0) + 1;
+            });
+
+            // Top converting queries
+            const convertingQueries = conversions.map(c => ({
+                query: c.query,
+                timestamp: c.timestamp,
+                liaPageVisited: c.liaPageVisited,
+                conversionType: c.liaConversion
+            })).slice(0, 20);
+
+            return {
+                totalConversions: conversions.length,
+                totalQueries,
+                conversionRate: parseFloat(conversionRate),
+                conversionTypes,
+                convertingQueries,
+                days
+            };
+
+        } catch (error) {
+            console.error('❌ Error getting conversion stats:', error);
+            return {
+                totalConversions: 0,
+                totalQueries: 0,
+                conversionRate: 0,
+                conversionTypes: {},
+                convertingQueries: [],
+                error: error.message
+            };
+        }
     }
 
     /**
