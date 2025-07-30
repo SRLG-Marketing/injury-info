@@ -27,12 +27,7 @@ export class QueryTracker {
         this.analyticsCache = new Map();
         this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
         
-        console.log('📊 Query Tracker initialized with:', {
-            hubspotEnabled: this.enableHubSpotTracking && this.hubspotConnector,
-            fileLoggingEnabled: this.enableFileLogging,
-            batchSize: this.batchSize,
-            batchTimeout: this.batchTimeout
-        });
+        // Query Tracker initialized silently
     }
 
     /**
@@ -57,8 +52,6 @@ export class QueryTracker {
                 // Set timer for batch processing
                 this.scheduleBatchProcessing();
             }
-            
-            console.log(`📊 Query tracked: "${enrichedData.query}" (${enrichedData.keywords?.length || 0} keywords)`);
             
             return { success: true, queryId: enrichedData.queryId };
             
@@ -209,8 +202,6 @@ export class QueryTracker {
             this.batchTimer = null;
         }
 
-        console.log(`📦 Processing batch of ${batch.length} queries...`);
-
         try {
             // Send to HubSpot if enabled
             if (this.enableHubSpotTracking && this.hubspotConnector) {
@@ -219,8 +210,6 @@ export class QueryTracker {
 
             // Clear analytics cache since we have new data
             this.analyticsCache.clear();
-
-            console.log(`✅ Batch processed successfully: ${batch.length} queries`);
             
         } catch (error) {
             console.error('❌ Error processing batch:', error);
@@ -441,7 +430,6 @@ export class QueryTracker {
                 }
             }
 
-            console.log(`🎯 Conversion tracked: Query ${queryId} → ${conversionInfo.liaPageVisited}`);
             return { success: true, conversionId: `conv_${Date.now()}` };
 
         } catch (error) {

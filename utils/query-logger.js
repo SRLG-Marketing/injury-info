@@ -94,7 +94,6 @@ export class QueryLogger {
             conversions.push(conversionData);
             
             await fs.writeFile(conversionFile, JSON.stringify(conversions, null, 2));
-            console.log(`🎯 Conversion logged to ${conversionFile}`);
             
             return { success: true };
             
