@@ -6,6 +6,8 @@ export const SERVER_URLS = {
   },
   production: {
     vercel: 'https://injury-info.vercel.app',
+    main: 'https://injuryinfo.com',
+    www: 'https://www.injuryinfo.com',
     placeholder: 'https://your-app.vercel.app'
   }
 };
@@ -47,6 +49,12 @@ export function getCorsOrigins() {
     'https://injury-info.vercel.app',
     'http://injury-info.vercel.app',
     'injury-info.vercel.app',
+    'https://injuryinfo.com',
+    'http://injuryinfo.com',
+    'injuryinfo.com',
+    'https://www.injuryinfo.com',
+    'http://www.injuryinfo.com',
+    'www.injuryinfo.com',
     'https://your-app.vercel.app',
     'https://*.vercel.app',
     'https://srlg-marketing.github.io',

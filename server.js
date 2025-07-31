@@ -93,6 +93,11 @@ app.use(cors({
       return callback(null, true);
     }
     
+    // Special handling for injuryinfo.com domains
+    if (origin.includes('injuryinfo.com')) {
+      return callback(null, true);
+    }
+    
     // Log blocked origins for debugging
     console.log(`🚫 CORS blocked origin: ${origin}`);
     console.log(`📋 Allowed origins:`, allowedOrigins);
@@ -151,6 +156,11 @@ app.options('*', cors({
     
     // Special handling for Vercel domains
     if (origin.includes('vercel.app')) {
+      return callback(null, true);
+    }
+    
+    // Special handling for injuryinfo.com domains
+    if (origin.includes('injuryinfo.com')) {
       return callback(null, true);
     }
     
