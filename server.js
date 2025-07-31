@@ -48,6 +48,21 @@ const queryTracker = new QueryTracker({
 });
 
 // Middleware
+// Add a simple CORS middleware for production that's more permissive
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Cache-Control, Pragma, Expires, Accept, Accept-Language, Accept-Encoding, DNT, Connection, Upgrade-Insecure-Requests, User-Agent, Sec-Fetch-Dest, Sec-Fetch-Mode, Sec-Fetch-Site, Sec-Fetch-User');
+    
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(200);
+    } else {
+      next();
+    }
+  });
+}
+
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -72,6 +87,15 @@ app.use(cors({
     if (origin.includes('hs-sites.com') || origin.includes('hubspot.com')) {
       return callback(null, true);
     }
+    
+    // Special handling for Vercel domains
+    if (origin.includes('vercel.app')) {
+      return callback(null, true);
+    }
+    
+    // Log blocked origins for debugging
+    console.log(`🚫 CORS blocked origin: ${origin}`);
+    console.log(`📋 Allowed origins:`, allowedOrigins);
     
     return callback(new Error('Not allowed by CORS'));
   },
@@ -101,7 +125,37 @@ app.use(express.json());
 
 // Handle CORS preflight requests more comprehensively
 app.options('*', cors({
-  origin: getCorsOrigins(),
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = getCorsOrigins();
+    
+    // Check if origin is explicitly allowed
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Check wildcard patterns
+    for (const pattern of allowedOrigins) {
+      if (pattern.includes('*')) {
+        const regexPattern = pattern.replace(/\*/g, '.*');
+        if (new RegExp(regexPattern).test(origin)) return callback(null, true);
+      }
+    }
+    
+    // Special handling for HubSpot sandbox domains
+    if (origin.includes('hs-sites.com') || origin.includes('hubspot.com')) {
+      return callback(null, true);
+    }
+    
+    // Special handling for Vercel domains
+    if (origin.includes('vercel.app')) {
+      return callback(null, true);
+    }
+    
+    return callback(null, true); // Allow all preflight requests
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
@@ -579,6 +633,17 @@ app.get('/api/test', async (req, res) => {
   }
 });
 
+// CORS test endpoint
+app.get('/api/cors-test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'CORS is working',
+    origin: req.get('Origin'),
+    userAgent: req.get('User-Agent'),
+    timestamp: new Date().toISOString()
+  });
+});
+
 // API endpoint to get configuration status
 app.get('/api/config/status', (req, res) => {
   try {
@@ -786,6 +851,7 @@ app.listen(port, () => {
   console.log('   POST /api/cache/clear - Clear cache');
   console.log('   GET  /api/cache/stats - Get cache statistics');
   console.log('   GET  /api/test - Test OpenAI connection');
+  console.log('   GET  /api/cors-test - Test CORS configuration');
   console.log('   GET  /api/lia/active-cases - Get LIA active cases');
   console.log('   POST /api/lia/check-case - Check if a query relates to LIA active cases');
   console.log('   POST /api/verify-article - Verify if an article exists');

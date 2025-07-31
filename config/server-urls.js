@@ -42,9 +42,11 @@ export function getClientServerUrl() {
 export function getCorsOrigins() {
   const isDevelopment = process.env.NODE_ENV !== 'production';
   
-  // Base origins
+  // Base origins - include both with and without protocol
   const baseOrigins = [
     'https://injury-info.vercel.app',
+    'http://injury-info.vercel.app',
+    'injury-info.vercel.app',
     'https://your-app.vercel.app',
     'https://*.vercel.app',
     'https://srlg-marketing.github.io',
