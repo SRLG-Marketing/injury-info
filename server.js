@@ -98,6 +98,11 @@ app.use(cors({
       return callback(null, true);
     }
     
+    // Special handling for any subdomain of injuryinfo.com
+    if (origin.match(/^https?:\/\/([^.]+\.)?injuryinfo\.com$/)) {
+      return callback(null, true);
+    }
+    
     // Log blocked origins for debugging
     console.log(`🚫 CORS blocked origin: ${origin}`);
     console.log(`📋 Allowed origins:`, allowedOrigins);
@@ -161,6 +166,11 @@ app.options('*', cors({
     
     // Special handling for injuryinfo.com domains
     if (origin.includes('injuryinfo.com')) {
+      return callback(null, true);
+    }
+    
+    // Special handling for any subdomain of injuryinfo.com
+    if (origin.match(/^https?:\/\/([^.]+\.)?injuryinfo\.com$/)) {
       return callback(null, true);
     }
     
@@ -650,7 +660,45 @@ app.get('/api/cors-test', (req, res) => {
     message: 'CORS is working',
     origin: req.get('Origin'),
     userAgent: req.get('User-Agent'),
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    allowedOrigins: getCorsOrigins(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Comprehensive CORS test endpoint
+app.get('/api/cors-test-comprehensive', (req, res) => {
+  const origin = req.get('Origin');
+  const allowedOrigins = getCorsOrigins();
+  
+  // Test various domain patterns
+  const domainTests = {
+    'injuryinfo.com': origin?.includes('injuryinfo.com'),
+    'www.injuryinfo.com': origin?.includes('www.injuryinfo.com'),
+    'subdomain.injuryinfo.com': origin?.match(/^https?:\/\/([^.]+\.)?injuryinfo\.com$/),
+    'vercel.app': origin?.includes('vercel.app'),
+    'hubspot.com': origin?.includes('hubspot.com'),
+    'hs-sites.com': origin?.includes('hs-sites.com'),
+    'explicitly_allowed': allowedOrigins.includes(origin),
+    'wildcard_match': allowedOrigins.some(pattern => {
+      if (pattern.includes('*')) {
+        const regexPattern = pattern.replace(/\*/g, '.*');
+        return new RegExp(regexPattern).test(origin);
+      }
+      return false;
+    })
+  };
+  
+  res.json({
+    success: true,
+    message: 'Comprehensive CORS test',
+    origin,
+    userAgent: req.get('User-Agent'),
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    domainTests,
+    allowedOrigins: allowedOrigins.slice(0, 10), // Show first 10 for brevity
+    totalAllowedOrigins: allowedOrigins.length
   });
 });
 
@@ -862,6 +910,7 @@ app.listen(port, () => {
   console.log('   GET  /api/cache/stats - Get cache statistics');
   console.log('   GET  /api/test - Test OpenAI connection');
   console.log('   GET  /api/cors-test - Test CORS configuration');
+  console.log('   GET  /api/cors-test-comprehensive - Comprehensive CORS test');
   console.log('   GET  /api/lia/active-cases - Get LIA active cases');
   console.log('   POST /api/lia/check-case - Check if a query relates to LIA active cases');
   console.log('   POST /api/verify-article - Verify if an article exists');

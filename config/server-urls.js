@@ -55,6 +55,8 @@ export function getCorsOrigins() {
     'https://www.injuryinfo.com',
     'http://www.injuryinfo.com',
     'www.injuryinfo.com',
+    'https://*.injuryinfo.com',
+    'http://*.injuryinfo.com',
     'https://your-app.vercel.app',
     'https://*.vercel.app',
     'https://srlg-marketing.github.io',
